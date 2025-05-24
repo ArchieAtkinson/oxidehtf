@@ -1,9 +1,7 @@
 mod app;
 mod events;
 
-use tokio::time::Duration;
-
-use app::{handle_event, update, view, AppState, Model};
+use app::{AppState, Model};
 use color_eyre::eyre::Result;
 use events::{EventHandler, IncomingEvents, OutgoingEvents};
 use tokio::sync::mpsc;
@@ -27,8 +25,6 @@ async fn main() -> Result<()> {
             _ = &mut handle => {
                 break;
             }
-
-
         }
     }
     Ok(())
@@ -42,10 +38,10 @@ async fn app(
     let mut model = Model::new(recv, send);
 
     while model.mode() != AppState::Done {
-        terminal.draw(|f| view(&model, f))?;
+        terminal.draw(|f| model.view(f))?;
 
-        if let Some(msg) = handle_event(&model).await? {
-            update(&mut model, msg).await?;
+        if let Some(msg) = model.handle_event().await? {
+            model.update(msg).await?;
         }
     }
     ratatui::restore();
