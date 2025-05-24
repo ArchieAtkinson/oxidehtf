@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use cli_log::*;
 use color_eyre::eyre::{Context, OptionExt, Result};
 use crossterm::event::EventStream;
 use futures::StreamExt;
@@ -5,23 +8,21 @@ use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
+    symbols,
     text::{Line, Span, ToSpan},
-    widgets::{Block, List, Paragraph},
+    widgets::{Block, LineGauge, List, Paragraph},
     Frame,
 };
 use tokio::sync::mpsc;
-use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
 
-use crate::events::{IncomingEvents, OutgoingEvents};
+use crate::test_runner::{TestMetadata, TestState};
 
-#[derive(Debug)]
 pub struct Model {
     input: Input,
     state: AppState,
-    messages: Vec<String>,
-    send: mpsc::UnboundedSender<IncomingEvents>,
-    recv: mpsc::UnboundedReceiver<OutgoingEvents>,
+    tests: Vec<TestMetadata>,
+    recv: mpsc::UnboundedReceiver<TestMetadata>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -32,63 +33,86 @@ pub enum AppState {
 }
 
 pub enum Message {
-    UserInput(Event),
     ExitApp,
-    SubmitInput,
+    TestUpdate(TestMetadata),
 }
 
 impl Model {
-    pub fn new(
-        recv: mpsc::UnboundedReceiver<OutgoingEvents>,
-        send: mpsc::UnboundedSender<IncomingEvents>,
-    ) -> Self {
+    pub fn new(recv: mpsc::UnboundedReceiver<TestMetadata>) -> Self {
         Self {
             input: Default::default(),
             state: Default::default(),
             recv,
-            send,
-            messages: Default::default(),
+            tests: Default::default(),
         }
+    }
+
+    pub async fn handle_event(&mut self) -> Result<Option<Message>> {
+        let mut events = EventStream::new();
+        tokio::select! {
+            event = events.next() => {
+                if let Some(Ok(Event::Key(key))) = event {
+                    return match self.state {
+                        AppState::Running => match key.code {
+                            KeyCode::Esc => Ok(Some(Message::ExitApp)),
+                            _ => Ok(None),
+                        },
+                        _ => Ok(None),
+                    };
+                }
+            }
+
+            test_data = self.recv.recv() => {
+                if let Some(data) = test_data {
+                   return Ok(Some(Message::TestUpdate(data)));
+                }
+            }
+        }
+        Ok(None)
     }
 
     pub async fn update(&mut self, msg: Message) -> Result<()> {
         match msg {
             Message::ExitApp => self.state = AppState::Done,
-            Message::SubmitInput => self.push_message().await?,
-            Message::UserInput(e) => {
-                let _ = self.input.handle_event(&e);
-            }
+            Message::TestUpdate(d) => self.update_tests(d).await?,
         }
         Ok(())
     }
 
-    pub async fn handle_event(&self) -> Result<Option<Message>> {
-        let mut events = EventStream::new();
-        let event = events.next().await.ok_or_eyre("End of Stream")??;
-        if let Event::Key(key) = event {
-            return match self.state {
-                AppState::Running => match key.code {
-                    KeyCode::Enter => Ok(Some(Message::SubmitInput)),
-                    KeyCode::Esc => Ok(Some(Message::ExitApp)),
-                    _ => Ok(Some(Message::UserInput(event))),
-                },
-                _ => Ok(None),
-            };
-        }
-        Ok(None)
-    }
-
     pub fn view(&self, frame: &mut Frame) {
-        let [header_area, input_area, messages_area] = Layout::vertical([
+        let [progress_area, header_area, input_area, messages_area] = Layout::vertical([
+            Constraint::Length(3),
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Min(1),
         ])
         .areas(frame.area());
 
+        self.render_progress(frame, progress_area);
         self.render_help_message(frame, header_area);
         self.render_input(frame, input_area);
         self.render_messages(frame, messages_area);
+    }
+
+    fn render_progress(&self, frame: &mut Frame, area: Rect) {
+        let tests_finished = self
+            .tests
+            .iter()
+            .filter(|d| d.state == TestState::Passed || d.state == TestState::Failed)
+            .count() as f64;
+
+        let total_tests = self.tests.len() as f64;
+
+        let mut progress: f64 = tests_finished / total_tests;
+        if total_tests == 0.0 {
+            progress = 0.0;
+        }
+
+        let bar = LineGauge::default()
+            .filled_style(Style::new().white().on_black().bold())
+            .block(Block::bordered().title("Progress"))
+            .ratio(progress);
+        frame.render_widget(bar, area);
     }
 
     fn render_help_message(&self, frame: &mut Frame, area: Rect) {
@@ -131,20 +155,25 @@ impl Model {
 
     pub fn render_messages(&self, frame: &mut Frame, area: Rect) {
         let messages = self
-            .messages
+            .tests
             .iter()
             .enumerate()
-            .map(|(i, message)| format!("{}: {}", i, message));
+            .map(|(i, data)| format!("{}: {} {:?}", i, data.name, data.state));
         let messages = List::new(messages).block(Block::bordered().title("Messages"));
         frame.render_widget(messages, area);
     }
-    pub async fn push_message(&mut self) -> Result<()> {
-        self.send
-            .send(IncomingEvents::InputRequest(self.input.value_and_reset()))
-            .wrap_err("Issue")?;
-        let msg = self.recv.recv().await.expect("Failed");
-        match msg {
-            OutgoingEvents::OperatorInput(s) => self.messages.push(s),
+
+    pub async fn update_tests(&mut self, data: TestMetadata) -> Result<()> {
+        let mut found = false;
+        for item in self.tests.iter_mut() {
+            if item.name == data.name {
+                item.state = data.state.clone();
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self.tests.push(data);
         }
         Ok(())
     }
