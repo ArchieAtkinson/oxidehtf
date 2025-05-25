@@ -13,10 +13,7 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
-use crate::{
-    test_runner::{TestMetadata, TestState},
-    OperatorInput, OperatorPrompt,
-};
+use crate::test_runner::{OperatorInput, OperatorPrompt, TestMetadata, TestState};
 
 pub struct Model {
     input: Input,

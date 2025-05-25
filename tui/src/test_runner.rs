@@ -1,8 +1,6 @@
 use color_eyre::{eyre::eyre, Result};
 use tokio::sync::mpsc;
 
-use crate::{OperatorInput, OperatorPrompt};
-
 pub struct TestRunner {
     tests: Vec<Test>,
     test_sender: mpsc::UnboundedSender<TestMetadata>,
@@ -28,16 +26,22 @@ pub enum TestState {
     Failed,
 }
 
+#[derive(Debug)]
+pub struct OperatorPrompt(pub String);
+
+#[derive(Debug)]
+pub struct OperatorInput(pub String);
+
 #[macro_export]
 macro_rules! register_test {
     ($($func_name:ident),*) => {
         vec![
             $(
-                crate::test_runner::Test {
+                tui::test_runner::Test {
                     func: $func_name,
                     data: TestMetadata {
                         name: stringify!($func_name),
-                        state: crate::test_runner::TestState::Waiting,
+                        state: tui::test_runner::TestState::Waiting,
                     },
                 }
             ),*

@@ -1,14 +1,13 @@
-mod app;
-mod events;
-mod test_runner;
-
-use app::{AppState, Model};
 use cli_log::*;
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
-use test_runner::OperatorComms;
-use test_runner::{TestMetadata, TestRunner};
 use tokio::sync::mpsc;
+use tui::app::{AppState, Model};
+use tui::register_test;
+use tui::test_runner::OperatorComms;
+use tui::test_runner::OperatorInput;
+use tui::test_runner::OperatorPrompt;
+use tui::test_runner::{TestMetadata, TestRunner};
 
 fn test1(comms: &mut OperatorComms) -> Result<()> {
     info!("Waiting");
@@ -51,12 +50,6 @@ fn test6(comms: &mut OperatorComms) -> Result<()> {
     info!("{:?}", value);
     Ok(())
 }
-
-#[derive(Debug)]
-struct OperatorPrompt(String);
-
-#[derive(Debug)]
-struct OperatorInput(String);
 
 #[tokio::main]
 async fn main() -> Result<()> {
