@@ -39,7 +39,7 @@ macro_rules! register_test {
             $(
                 htf::test_runner::Test {
                     func: $func_name,
-                    data: TestMetadata {
+                    data: htf::test_runner::TestMetadata {
                         name: stringify!($func_name),
                         state: htf::test_runner::TestState::Waiting,
                     },
@@ -91,7 +91,7 @@ pub struct OperatorComms {
 
 impl OperatorComms {
     pub fn request_input(&mut self, prompt: String) -> Result<String> {
-        self.prompt_sender.send(OperatorPrompt(prompt));
+        self.prompt_sender.send(OperatorPrompt(prompt))?;
         let OperatorInput(input) = self
             .operator_recivier
             .blocking_recv()
