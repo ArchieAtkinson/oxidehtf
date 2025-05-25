@@ -37,11 +37,11 @@ macro_rules! register_test {
     ($($func_name:ident),*) => {
         vec![
             $(
-                tui::test_runner::Test {
+                htf::test_runner::Test {
                     func: $func_name,
                     data: TestMetadata {
                         name: stringify!($func_name),
-                        state: tui::test_runner::TestState::Waiting,
+                        state: htf::test_runner::TestState::Waiting,
                     },
                 }
             ),*

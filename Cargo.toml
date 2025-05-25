@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "tui",
+  "htf",
   "macros"
 ]
 resolver = "2"

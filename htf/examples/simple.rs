@@ -1,13 +1,13 @@
 use cli_log::*;
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
+use htf::register_test;
+use htf::test_runner::OperatorComms;
+use htf::test_runner::OperatorInput;
+use htf::test_runner::OperatorPrompt;
+use htf::test_runner::{TestMetadata, TestRunner};
+use htf::ui::{AppState, Model};
 use tokio::sync::mpsc;
-use tui::app::{AppState, Model};
-use tui::register_test;
-use tui::test_runner::OperatorComms;
-use tui::test_runner::OperatorInput;
-use tui::test_runner::OperatorPrompt;
-use tui::test_runner::{TestMetadata, TestRunner};
 
 fn test1(comms: &mut OperatorComms) -> Result<()> {
     info!("Waiting");
