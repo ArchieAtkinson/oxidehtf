@@ -1,49 +1,63 @@
-use std::collections::HashMap;
-
 use cli_log::*;
-use color_eyre::eyre::{Context, OptionExt, Result};
+use color_eyre::eyre::Result;
 use crossterm::event::EventStream;
 use futures::StreamExt;
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode},
+    crossterm::event::{Event, KeyCode},
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
-    symbols,
     text::{Line, Span, ToSpan},
     widgets::{Block, LineGauge, List, Paragraph},
     Frame,
 };
 use tokio::sync::mpsc;
-use tui_input::Input;
+use tui_input::{backend::crossterm::EventHandler, Input};
 
-use crate::test_runner::{TestMetadata, TestState};
+use crate::{
+    test_runner::{TestMetadata, TestState},
+    OperatorInput, OperatorPrompt,
+};
 
 pub struct Model {
     input: Input,
     state: AppState,
     tests: Vec<TestMetadata>,
-    recv: mpsc::UnboundedReceiver<TestMetadata>,
+    prompt: String,
+    test_recivier: mpsc::UnboundedReceiver<TestMetadata>,
+    prompt_recivier: mpsc::UnboundedReceiver<OperatorPrompt>,
+    input_sender: mpsc::UnboundedSender<OperatorInput>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AppState {
-    #[default]
     Running,
+    #[default]
+    WaitingForInput,
     Done,
 }
 
 pub enum Message {
     ExitApp,
     TestUpdate(TestMetadata),
+    OperatorInput(Event),
+    SendInput,
+    OperatorPrompt(String),
 }
 
 impl Model {
-    pub fn new(recv: mpsc::UnboundedReceiver<TestMetadata>) -> Self {
+    pub fn new(
+        test_recivier: mpsc::UnboundedReceiver<TestMetadata>,
+        prompt_recivier: mpsc::UnboundedReceiver<OperatorPrompt>,
+        input_sender: mpsc::UnboundedSender<OperatorInput>,
+    ) -> Self {
         Self {
             input: Default::default(),
             state: Default::default(),
-            recv,
             tests: Default::default(),
+            prompt: String::from("No Input Required"),
+            test_recivier,
+            prompt_recivier,
+            input_sender,
         }
     }
 
@@ -51,21 +65,36 @@ impl Model {
         let mut events = EventStream::new();
         tokio::select! {
             event = events.next() => {
-                if let Some(Ok(Event::Key(key))) = event {
-                    return match self.state {
-                        AppState::Running => match key.code {
-                            KeyCode::Esc => Ok(Some(Message::ExitApp)),
+                if let Some(event) = event.transpose()? {
+                    if let Event::Key(key) = event {
+                        return match self.state {
+                            AppState::Running => match key.code {
+                                KeyCode::Esc => Ok(Some(Message::ExitApp)),
+                                _ => Ok(None),
+                            },
+                            AppState::WaitingForInput => match key.code {
+                                KeyCode::Esc => Ok(Some(Message::ExitApp)),
+                                KeyCode::Enter => Ok(Some(Message::SendInput)),
+                                _ => Ok(Some(Message::OperatorInput(event))),
+                            }
+
                             _ => Ok(None),
-                        },
-                        _ => Ok(None),
-                    };
+                        };
+                    }
                 }
             }
 
-            test_data = self.recv.recv() => {
+            test_data = self.test_recivier.recv() => {
                 if let Some(data) = test_data {
                    return Ok(Some(Message::TestUpdate(data)));
                 }
+            }
+
+            prompt = self.prompt_recivier.recv() => {
+                if let Some(data) = prompt {
+                    return Ok(Some(Message::OperatorPrompt(data.0)));
+                }
+
             }
         }
         Ok(None)
@@ -75,6 +104,11 @@ impl Model {
         match msg {
             Message::ExitApp => self.state = AppState::Done,
             Message::TestUpdate(d) => self.update_tests(d).await?,
+            Message::OperatorInput(e) => {
+                let _ = self.input.handle_event(&e);
+            }
+            Message::SendInput => self.send_input(),
+            Message::OperatorPrompt(s) => self.prompt = s,
         }
         Ok(())
     }
@@ -117,15 +151,14 @@ impl Model {
 
     fn render_help_message(&self, frame: &mut Frame, area: Rect) {
         let help_message = Line::from(match self.state {
-            AppState::Running => {
-                vec![
-                    "Press ".to_span(),
-                    "Esc".bold(),
-                    " to exit, ".to_span(),
-                    "Enter".bold(),
-                    " to record message.".to_span(),
-                ]
-            }
+            AppState::Running => vec![
+                "Press ".to_span(),
+                "Esc".bold(),
+                " to exit, ".to_span(),
+                "Enter".bold(),
+                " to record message.".to_span(),
+            ],
+            AppState::WaitingForInput => vec![self.prompt.to_span()],
             AppState::Done => vec![Span::default()],
         });
         frame.render_widget(help_message, area);
@@ -136,7 +169,7 @@ impl Model {
         let width = area.width.max(3) - 3;
         let scroll = self.input.visual_scroll(width as usize);
         let style = match self.state {
-            AppState::Running => Color::Yellow.into(),
+            AppState::WaitingForInput => Color::Yellow.into(),
             _ => Style::default(),
         };
         let input = Paragraph::new(self.input.value())
@@ -180,5 +213,10 @@ impl Model {
 
     pub fn mode(&self) -> AppState {
         self.state
+    }
+
+    fn send_input(&mut self) {
+        let input = OperatorInput(self.input.value_and_reset());
+        self.input_sender.send(input);
     }
 }

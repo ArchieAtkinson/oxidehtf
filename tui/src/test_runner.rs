@@ -1,15 +1,16 @@
-use tokio::time::Duration;
-
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use tokio::sync::mpsc;
+
+use crate::{OperatorInput, OperatorPrompt};
 
 pub struct TestRunner {
     tests: Vec<Test>,
-    sender: mpsc::UnboundedSender<TestMetadata>,
+    test_sender: mpsc::UnboundedSender<TestMetadata>,
+    operator_comms: OperatorComms,
 }
 
 pub struct Test {
-    pub func: fn() -> Result<()>,
+    pub func: fn(&mut OperatorComms) -> Result<()>,
     pub data: TestMetadata,
 }
 
@@ -43,26 +44,54 @@ macro_rules! register_test {
         ]
     };
 }
+
 impl TestRunner {
-    pub fn new(sender: mpsc::UnboundedSender<TestMetadata>, tests: Vec<Test>) -> Result<Self> {
+    pub fn new(
+        test_sender: mpsc::UnboundedSender<TestMetadata>,
+        prompt_sender: mpsc::UnboundedSender<OperatorPrompt>,
+        operator_recivier: mpsc::UnboundedReceiver<OperatorInput>,
+        tests: Vec<Test>,
+    ) -> Result<Self> {
         for test in &tests {
-            sender.send(test.data.clone())?
+            test_sender.send(test.data.clone())?
         }
-        Ok(Self { tests, sender })
+        Ok(Self {
+            tests,
+            test_sender,
+            operator_comms: OperatorComms {
+                prompt_sender,
+                operator_recivier,
+            },
+        })
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         for test in &mut self.tests {
             test.data.state = TestState::Running;
-            self.sender.send(test.data.clone())?;
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            let result = (test.func)();
+            self.test_sender.send(test.data.clone())?;
+            let result = (test.func)(&mut self.operator_comms);
             test.data.state = match result {
                 Ok(_) => TestState::Passed,
                 Err(_) => TestState::Failed,
             };
-            self.sender.send(test.data.clone())?
+            self.test_sender.send(test.data.clone())?
         }
         Ok(())
+    }
+}
+
+pub struct OperatorComms {
+    prompt_sender: mpsc::UnboundedSender<OperatorPrompt>,
+    operator_recivier: mpsc::UnboundedReceiver<OperatorInput>,
+}
+
+impl OperatorComms {
+    pub fn request_input(&mut self, prompt: String) -> Result<String> {
+        self.prompt_sender.send(OperatorPrompt(prompt));
+        let OperatorInput(input) = self
+            .operator_recivier
+            .blocking_recv()
+            .ok_or(eyre!("Failed to get input"))?;
+        Ok(input)
     }
 }
