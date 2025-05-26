@@ -1,10 +1,7 @@
-use crate::test_runner::TestMetadata;
-
 #[derive(Debug, Clone)]
-pub enum Event {
-    ExitApp,
-    TestUpdate(TestMetadata),
+pub enum Action {
     OperatorInput(crossterm::event::Event),
     SendInput,
     OperatorPrompt(String),
+    ExitApp,
 }

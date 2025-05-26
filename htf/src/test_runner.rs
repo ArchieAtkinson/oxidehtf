@@ -11,7 +11,7 @@ pub struct Test {
     pub data: TestMetadata,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,

@@ -1,46 +1,46 @@
 use cli_log::*;
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
-use htf::operator;
+use htf::operator::Input;
 
 fn test1() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 1 Input:");
+    let value = Input::request("Test 1 Input:");
     info!("{:?}", value);
     Ok(())
 }
 
 fn test2() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 2 Input:");
+    let value = Input::request("Test 2 Input:");
     info!("{:?}", value);
     Err(eyre!("Err"))
 }
 
 fn test3() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 3 Input:");
+    let value = Input::request("Test 3 Input:");
     info!("{:?}", value);
     Ok(())
 }
 
 fn test4() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 4 Input:");
+    let value = Input::request("Test 4 Input:");
     info!("{:?}", value);
     Ok(())
 }
 
 fn test5() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 5 Input:");
+    let value = Input::request("Test 5 Input:");
     info!("{:?}", value);
     Ok(())
 }
 
 fn test6() -> Result<()> {
     info!("Waiting");
-    let value = operator::request_input("Test 6 Input:");
+    let value = Input::request("Test 6 Input:");
     info!("{:?}", value);
     Ok(())
 }
