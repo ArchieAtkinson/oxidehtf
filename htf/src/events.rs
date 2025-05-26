@@ -6,5 +6,4 @@ pub enum Event {
     TestUpdate(TestMetadata),
     OperatorInput(crossterm::event::Event),
     SendInput,
-    OperatorPrompt(String),
 }

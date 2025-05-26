@@ -39,8 +39,10 @@ pub enum AppState {
 impl Ui {
     pub fn new(test_recivier: mpsc::UnboundedReceiver<TestMetadata>) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+        let mut op_input = Input::new()?;
+        op_input.register_action_handler(action_tx.clone())?;
         Ok(Self {
-            op_input: Input::new()?,
+            op_input,
             state: Default::default(),
             tests: Default::default(),
             test_recivier,
@@ -77,10 +79,6 @@ impl Ui {
                    return Ok(Some(Event::TestUpdate(data)));
                 }
             }
-
-            prompt = self.op_input.prompt() => {
-                return Ok(prompt)
-            }
         }
         Ok(None)
     }
@@ -91,10 +89,15 @@ impl Ui {
             Event::TestUpdate(d) => self.update_tests(d).await?,
             _ => (),
         }
-        let Some(action) = self.op_input.handle_events(Some(event))? else {
-            return Ok(());
+        if let Some(action) = self.op_input.handle_events(Some(event))? {
+            self.action_tx.send(action)?;
         };
-        self.op_input.update(action)?;
+
+        if let Ok(action) = self.action_rx.try_recv() {
+            if let Some(new_action) = self.op_input.update(action)? {
+                self.action_tx.send(new_action)?;
+            }
+        }
         Ok(())
     }
 

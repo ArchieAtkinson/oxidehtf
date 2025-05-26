@@ -1,6 +1,9 @@
 use std::sync::OnceLock;
 
-use color_eyre::eyre::{eyre, Result};
+use color_eyre::{
+    eyre::{eyre, OptionExt, Result},
+    owo_colors::OwoColorize,
+};
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect, Size},
@@ -37,42 +40,24 @@ pub struct OperatorPrompt(pub String);
 pub struct OperatorInput(pub String);
 
 struct TestOperatorComms {
-    prompt_sender: mpsc::UnboundedSender<OperatorPrompt>,
-    operator_recivier: mpsc::UnboundedReceiver<OperatorInput>,
-}
-
-pub struct UIOperatorComms {
-    pub prompt_receiver: mpsc::UnboundedReceiver<OperatorPrompt>,
-    pub operator_sender: mpsc::UnboundedSender<OperatorInput>,
+    prompt_tx: mpsc::UnboundedSender<Action>,
+    operator_rx: mpsc::UnboundedReceiver<OperatorInput>,
 }
 
 const DEFAULT_PROMPT_TEXT: &'static str = "No Input Currently Required";
 
 pub struct Input {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
-    ui_comms: UIOperatorComms,
+    input_tx: Option<mpsc::UnboundedSender<OperatorInput>>,
     txt_input: tui_input::Input,
     prompt_text: String,
 }
 
 impl Input {
     pub fn new() -> Result<Self> {
-        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
-        let (prompt_tx, prompt_rx) = mpsc::unbounded_channel::<OperatorPrompt>();
-
-        OPERATOR_COMMS
-            .set(Mutex::new(TestOperatorComms {
-                prompt_sender: prompt_tx,
-                operator_recivier: input_rx,
-            }))
-            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
-
         Ok(Self {
             action_tx: Default::default(),
-            ui_comms: UIOperatorComms {
-                prompt_receiver: prompt_rx,
-                operator_sender: input_tx,
-            },
+            input_tx: Default::default(),
             txt_input: Default::default(),
             prompt_text: DEFAULT_PROMPT_TEXT.to_string(),
         })
@@ -83,20 +68,17 @@ impl Input {
             .get()
             .expect("Failed to get oncelock")
             .blocking_lock();
-        comms.prompt_sender.send(OperatorPrompt(prompt.into()))?;
-        let OperatorInput(input) = comms
-            .operator_recivier
-            .blocking_recv()
-            .ok_or(eyre!("Failed to get input"))?;
-        Ok(input)
-    }
 
-    pub async fn prompt(&mut self) -> Option<Event> {
-        self.ui_comms
-            .prompt_receiver
-            .recv()
-            .await
-            .map(|p| Event::OperatorPrompt(p.0))
+        comms
+            .prompt_tx
+            .send(Action::OperatorPrompt(prompt.into()))?;
+
+        let OperatorInput(input) = comms
+            .operator_rx
+            .blocking_recv()
+            .ok_or_eyre("Failed to get input")?;
+
+        Ok(input)
     }
 
     fn draw_prompt(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
@@ -126,7 +108,17 @@ impl Input {
 
 impl Component for Input {
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
-        self.action_tx = Some(tx);
+        self.action_tx = Some(tx.clone());
+        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
+        self.input_tx = Some(input_tx);
+
+        OPERATOR_COMMS
+            .set(Mutex::new(TestOperatorComms {
+                prompt_tx: tx,
+                operator_rx: input_rx,
+            }))
+            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
+
         Ok(())
     }
 
@@ -137,7 +129,6 @@ impl Component for Input {
         match event {
             Event::OperatorInput(e) => Ok(Some(Action::OperatorInput(e))),
             Event::SendInput => Ok(Some(Action::SendInput)),
-            Event::OperatorPrompt(p) => Ok(Some(Action::OperatorPrompt(p))),
             _ => Ok(None),
         }
     }
@@ -150,7 +141,7 @@ impl Component for Input {
             }
             Action::SendInput => {
                 let input = OperatorInput(self.txt_input.value_and_reset());
-                self.ui_comms.operator_sender.send(input)?;
+                self.input_tx.as_ref().ok_or_eyre("Issue")?.send(input)?;
                 Ok(None)
             }
             Action::OperatorPrompt(p) => {
