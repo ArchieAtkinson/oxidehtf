@@ -4,7 +4,7 @@ pub mod test_runner;
 pub(crate) mod ui;
 
 use crate::test_runner::{TestMetadata, TestRunner};
-use crate::ui::{AppState, Model};
+use crate::ui::{AppState, Ui};
 
 use cli_log::*;
 use color_eyre::eyre::Result;
@@ -18,7 +18,9 @@ pub fn run_tests(tests: Vec<Test>) -> Result<()> {
 
     let (test_data_send, test_data_recv) = mpsc::unbounded_channel::<TestMetadata>();
     let ui_op_comms = operator::init()?;
+
     let mut runner = TestRunner::new(test_data_send, tests)?;
+    let mut model = Ui::new(test_data_recv, ui_op_comms);
 
     let rt = Runtime::new()?;
 
@@ -30,7 +32,6 @@ pub fn run_tests(tests: Vec<Test>) -> Result<()> {
 
         let app_handle: JoinHandle<Result<()>> = tokio::spawn(async move {
             let mut terminal = ratatui::init();
-            let mut model = Model::new(test_data_recv, ui_op_comms);
 
             while model.mode() != AppState::Done {
                 if let Some(msg) = model.handle_event().await? {

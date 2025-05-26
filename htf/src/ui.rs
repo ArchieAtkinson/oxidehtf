@@ -18,7 +18,7 @@ use crate::{
     test_runner::{TestMetadata, TestState},
 };
 
-pub struct Model {
+pub struct Ui {
     input: Input,
     state: AppState,
     tests: Vec<TestMetadata>,
@@ -43,7 +43,7 @@ pub enum Message {
     OperatorPrompt(String),
 }
 
-impl Model {
+impl Ui {
     pub fn new(
         test_recivier: mpsc::UnboundedReceiver<TestMetadata>,
         op_comms: UIOperatorComms,
