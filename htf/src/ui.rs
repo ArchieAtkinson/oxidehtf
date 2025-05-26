@@ -1,4 +1,4 @@
-use cli_log::*;
+// use cli_log::*;
 use color_eyre::eyre::Result;
 use crossterm::event::EventStream;
 use futures::StreamExt;
@@ -26,11 +26,11 @@ pub struct Ui {
     op_input: Input,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
+    event_rx: mpsc::UnboundedReceiver<Event>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AppState {
-    Running,
     #[default]
     WaitingForInput,
     Done,
@@ -39,7 +39,9 @@ pub enum AppState {
 impl Ui {
     pub fn new(test_recivier: mpsc::UnboundedReceiver<TestMetadata>) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let mut op_input = Input::new()?;
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+
+        let mut op_input = Input::new(event_tx.clone())?;
         op_input.register_action_handler(action_tx.clone())?;
         Ok(Self {
             op_input,
@@ -48,56 +50,67 @@ impl Ui {
             test_recivier,
             action_rx,
             action_tx,
+            event_rx,
         })
     }
 
-    pub async fn handle_event(&mut self) -> Result<Option<Event>> {
+    pub async fn handle_event(&mut self) -> Result<()> {
         let mut events = EventStream::new();
-        tokio::select! {
-            event = events.next() => {
-                if let Some(event) = event.transpose()? {
-                    if let crossterm::event::Event::Key(key) = event {
-                        return match self.state {
-                            AppState::Running => match key.code {
-                                KeyCode::Esc => Ok(Some(Event::ExitApp)),
-                                _ => Ok(None),
-                            },
-                            AppState::WaitingForInput => match key.code {
-                                KeyCode::Esc => Ok(Some(Event::ExitApp)),
-                                KeyCode::Enter => Ok(Some(Event::SendInput)),
-                                _ => Ok(Some(Event::OperatorInput(event))),
-                            }
 
-                            _ => Ok(None),
-                        };
-                    }
-                }
+        let event = tokio::select! {
+            crossterm = events.next() => {
+                crossterm.transpose()?.map(|e| Event::CrosstermEvent(e))
+
             }
-
             test_data = self.test_recivier.recv() => {
-                if let Some(data) = test_data {
-                   return Ok(Some(Event::TestUpdate(data)));
-                }
+                test_data.map(|d| Event::TestData(d))
             }
-        }
-        Ok(None)
-    }
+            external = self.event_rx.recv() => {
+                external
+            }
 
-    pub async fn update(&mut self, event: Event) -> Result<()> {
-        match event.clone() {
-            Event::ExitApp => self.state = AppState::Done,
-            Event::TestUpdate(d) => self.update_tests(d).await?,
-            _ => (),
-        }
-        if let Some(action) = self.op_input.handle_events(Some(event))? {
-            self.action_tx.send(action)?;
         };
 
+        let Some(event) = event else {
+            return Ok(());
+        };
+
+        match event {
+            Event::CrosstermEvent(event) => {
+                if let crossterm::event::Event::Key(key) = event {
+                    if key.code == KeyCode::Esc {
+                        self.action_tx.send(Action::ExitApp)?;
+                    }
+
+                    match self.state {
+                        AppState::WaitingForInput => match key.code {
+                            KeyCode::Enter => self.action_tx.send(Action::SendInput)?,
+                            _ => self.action_tx.send(Action::OperatorInput(event))?,
+                        },
+                        _ => (),
+                    };
+                }
+            }
+            Event::TestData(d) => self.action_tx.send(Action::TestUpdate(d))?,
+            Event::OperatorPrompt(p) => self.action_tx.send(Action::OperatorPrompt(p))?,
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_actions(&mut self) -> Result<()> {
         if let Ok(action) = self.action_rx.try_recv() {
+            match action.clone() {
+                Action::TestUpdate(d) => self.update_tests(d)?,
+                Action::ExitApp => self.state = AppState::Done,
+                Action::OperatorPrompt(_) => self.state = AppState::WaitingForInput,
+                _ => (),
+            }
             if let Some(new_action) = self.op_input.update(action)? {
                 self.action_tx.send(new_action)?;
             }
         }
+
         Ok(())
     }
 
@@ -146,7 +159,7 @@ impl Ui {
         frame.render_widget(messages, area);
     }
 
-    pub async fn update_tests(&mut self, data: TestMetadata) -> Result<()> {
+    pub fn update_tests(&mut self, data: TestMetadata) -> Result<()> {
         let mut found = false;
         for item in self.tests.iter_mut() {
             if item.name == data.name {

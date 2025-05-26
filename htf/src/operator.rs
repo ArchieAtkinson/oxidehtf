@@ -1,14 +1,10 @@
 use std::sync::OnceLock;
 
-use color_eyre::{
-    eyre::{eyre, OptionExt, Result},
-    owo_colors::OwoColorize,
-};
-use crossterm::event::KeyEvent;
+use color_eyre::eyre::{eyre, OptionExt, Result};
 use ratatui::{
-    layout::{Constraint, Layout, Rect, Size},
+    layout::{Constraint, Layout, Rect},
     style::Style,
-    text::{Line, ToLine, ToSpan},
+    text::ToLine,
     widgets::{Block, Paragraph},
     Frame,
 };
@@ -40,7 +36,7 @@ pub struct OperatorPrompt(pub String);
 pub struct OperatorInput(pub String);
 
 struct TestOperatorComms {
-    prompt_tx: mpsc::UnboundedSender<Action>,
+    prompt_tx: mpsc::UnboundedSender<Event>,
     operator_rx: mpsc::UnboundedReceiver<OperatorInput>,
 }
 
@@ -48,16 +44,25 @@ const DEFAULT_PROMPT_TEXT: &'static str = "No Input Currently Required";
 
 pub struct Input {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
-    input_tx: Option<mpsc::UnboundedSender<OperatorInput>>,
+    input_tx: mpsc::UnboundedSender<OperatorInput>,
     txt_input: tui_input::Input,
     prompt_text: String,
 }
 
 impl Input {
-    pub fn new() -> Result<Self> {
+    pub fn new(event_tx: mpsc::UnboundedSender<Event>) -> Result<Self> {
+        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
+
+        OPERATOR_COMMS
+            .set(Mutex::new(TestOperatorComms {
+                prompt_tx: event_tx,
+                operator_rx: input_rx,
+            }))
+            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
+
         Ok(Self {
             action_tx: Default::default(),
-            input_tx: Default::default(),
+            input_tx,
             txt_input: Default::default(),
             prompt_text: DEFAULT_PROMPT_TEXT.to_string(),
         })
@@ -69,9 +74,7 @@ impl Input {
             .expect("Failed to get oncelock")
             .blocking_lock();
 
-        comms
-            .prompt_tx
-            .send(Action::OperatorPrompt(prompt.into()))?;
+        comms.prompt_tx.send(Event::OperatorPrompt(prompt.into()))?;
 
         let OperatorInput(input) = comms
             .operator_rx
@@ -109,15 +112,6 @@ impl Input {
 impl Component for Input {
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
-        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
-        self.input_tx = Some(input_tx);
-
-        OPERATOR_COMMS
-            .set(Mutex::new(TestOperatorComms {
-                prompt_tx: tx,
-                operator_rx: input_rx,
-            }))
-            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
 
         Ok(())
     }
@@ -127,8 +121,8 @@ impl Component for Input {
             return Ok(None);
         };
         match event {
-            Event::OperatorInput(e) => Ok(Some(Action::OperatorInput(e))),
-            Event::SendInput => Ok(Some(Action::SendInput)),
+            // Event::OperatorInput(e) => Ok(Some(Action::OperatorInput(e))),
+            // Event::SendInput => Ok(Some(Action::SendInput)),
             _ => Ok(None),
         }
     }
@@ -141,7 +135,7 @@ impl Component for Input {
             }
             Action::SendInput => {
                 let input = OperatorInput(self.txt_input.value_and_reset());
-                self.input_tx.as_ref().ok_or_eyre("Issue")?.send(input)?;
+                self.input_tx.send(input)?;
                 Ok(None)
             }
             Action::OperatorPrompt(p) => {

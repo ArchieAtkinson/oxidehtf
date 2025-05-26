@@ -1,9 +1,5 @@
 use color_eyre::Result;
-use crossterm::event::KeyEvent;
-use ratatui::{
-    layout::{Rect, Size},
-    Frame,
-};
+use ratatui::{layout::Rect, Frame};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{actions::Action, events::Event};
@@ -11,11 +7,6 @@ use crate::{actions::Action, events::Event};
 pub trait Component {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         let _ = tx; // to appease clippy
-        Ok(())
-    }
-
-    fn init(&mut self, area: Size) -> Result<()> {
-        let _ = area; // to appease clippy
         Ok(())
     }
 

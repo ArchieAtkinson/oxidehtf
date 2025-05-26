@@ -9,7 +9,7 @@ use crate::test_runner::{TestMetadata, TestRunner};
 use crate::ui::{AppState, Ui};
 
 use cli_log::*;
-use color_eyre::eyre::{eyre, Result};
+use color_eyre::eyre::Result;
 use test_runner::Test;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -35,9 +35,9 @@ pub fn run_tests(tests: Vec<Test>) -> Result<()> {
             let mut terminal = ratatui::init();
 
             while ui.mode() != AppState::Done {
-                if let Some(msg) = ui.handle_event().await? {
-                    ui.update(msg).await?;
-                }
+                ui.handle_event().await?;
+                ui.handle_actions()?;
+
                 let mut result = Ok(());
                 terminal.draw(|f| result = ui.view(f))?;
                 if result.is_err() {
