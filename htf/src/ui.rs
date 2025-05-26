@@ -13,7 +13,10 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
-use crate::test_runner::{OperatorInput, OperatorPrompt, TestMetadata, TestState};
+use crate::{
+    operator::{OperatorInput, UIOperatorComms},
+    test_runner::{TestMetadata, TestState},
+};
 
 pub struct Model {
     input: Input,
@@ -21,8 +24,7 @@ pub struct Model {
     tests: Vec<TestMetadata>,
     prompt: String,
     test_recivier: mpsc::UnboundedReceiver<TestMetadata>,
-    prompt_recivier: mpsc::UnboundedReceiver<OperatorPrompt>,
-    input_sender: mpsc::UnboundedSender<OperatorInput>,
+    op_comms: UIOperatorComms,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -44,8 +46,7 @@ pub enum Message {
 impl Model {
     pub fn new(
         test_recivier: mpsc::UnboundedReceiver<TestMetadata>,
-        prompt_recivier: mpsc::UnboundedReceiver<OperatorPrompt>,
-        input_sender: mpsc::UnboundedSender<OperatorInput>,
+        op_comms: UIOperatorComms,
     ) -> Self {
         Self {
             input: Default::default(),
@@ -53,8 +54,7 @@ impl Model {
             tests: Default::default(),
             prompt: String::from("No Input Required"),
             test_recivier,
-            prompt_recivier,
-            input_sender,
+            op_comms,
         }
     }
 
@@ -87,7 +87,7 @@ impl Model {
                 }
             }
 
-            prompt = self.prompt_recivier.recv() => {
+            prompt = self.op_comms.prompt_receiver.recv() => {
                 if let Some(data) = prompt {
                     return Ok(Some(Message::OperatorPrompt(data.0)));
                 }
@@ -104,7 +104,7 @@ impl Model {
             Message::OperatorInput(e) => {
                 let _ = self.input.handle_event(&e);
             }
-            Message::SendInput => self.send_input(),
+            Message::SendInput => self.send_input()?,
             Message::OperatorPrompt(s) => self.prompt = s,
         }
         Ok(())
@@ -212,8 +212,9 @@ impl Model {
         self.state
     }
 
-    fn send_input(&mut self) {
+    fn send_input(&mut self) -> Result<()> {
         let input = OperatorInput(self.input.value_and_reset());
-        self.input_sender.send(input);
+        self.op_comms.operator_sender.send(input)?;
+        Ok(())
     }
 }
