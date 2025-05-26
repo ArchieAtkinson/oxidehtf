@@ -35,7 +35,8 @@ pub fn run_tests(tests: Vec<Test>) -> Result<()> {
             let mut terminal = ratatui::init();
 
             while ui.mode() != AppState::Done {
-                ui.handle_event().await?;
+                let event = ui.next_event().await?;
+                ui.handle_event(event)?;
                 ui.handle_actions()?;
 
                 let mut result = Ok(());

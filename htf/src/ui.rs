@@ -54,13 +54,12 @@ impl Ui {
         })
     }
 
-    pub async fn handle_event(&mut self) -> Result<()> {
+    pub async fn next_event(&mut self) -> Result<Option<Event>> {
         let mut events = EventStream::new();
 
-        let event = tokio::select! {
+        Ok(tokio::select! {
             crossterm = events.next() => {
                 crossterm.transpose()?.map(|e| Event::CrosstermEvent(e))
-
             }
             test_data = self.test_recivier.recv() => {
                 test_data.map(|d| Event::TestData(d))
@@ -68,9 +67,10 @@ impl Ui {
             external = self.event_rx.recv() => {
                 external
             }
+        })
+    }
 
-        };
-
+    pub fn handle_event(&mut self, event: Option<Event>) -> Result<()> {
         let Some(event) = event else {
             return Ok(());
         };
