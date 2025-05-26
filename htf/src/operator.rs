@@ -116,13 +116,8 @@ impl Component for Input {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
-        let Some(event) = event else {
-            return Ok(None);
-        };
+    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
         match event {
-            // Event::OperatorInput(e) => Ok(Some(Action::OperatorInput(e))),
-            // Event::SendInput => Ok(Some(Action::SendInput)),
             _ => Ok(None),
         }
     }

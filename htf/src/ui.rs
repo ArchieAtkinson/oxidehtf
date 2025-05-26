@@ -75,40 +75,49 @@ impl Ui {
             return Ok(());
         };
 
-        match event {
-            Event::CrosstermEvent(event) => {
-                if let crossterm::event::Event::Key(key) = event {
-                    if key.code == KeyCode::Esc {
-                        self.action_tx.send(Action::ExitApp)?;
+        match event.clone() {
+            Event::CrosstermEvent(crossterm_event) => {
+                if let crossterm::event::Event::Key(key) = crossterm_event {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.action_tx.send(Action::ExitApp)?;
+                        }
+                        KeyCode::Enter if self.state == AppState::WaitingForInput => {
+                            self.action_tx.send(Action::SendInput)?;
+                        }
+                        _ => {}
                     }
+                }
 
-                    match self.state {
-                        AppState::WaitingForInput => match key.code {
-                            KeyCode::Enter => self.action_tx.send(Action::SendInput)?,
-                            _ => self.action_tx.send(Action::OperatorInput(event))?,
-                        },
-                        _ => (),
-                    };
+                if self.state == AppState::WaitingForInput {
+                    self.action_tx
+                        .send(Action::OperatorInput(crossterm_event))?;
                 }
             }
             Event::TestData(d) => self.action_tx.send(Action::TestUpdate(d))?,
             Event::OperatorPrompt(p) => self.action_tx.send(Action::OperatorPrompt(p))?,
         }
 
+        if let Some(action) = self.op_input.handle_events(event)? {
+            self.action_tx.send(action)?;
+        }
+
         Ok(())
     }
 
     pub fn handle_actions(&mut self) -> Result<()> {
-        if let Ok(action) = self.action_rx.try_recv() {
-            match action.clone() {
-                Action::TestUpdate(d) => self.update_tests(d)?,
-                Action::ExitApp => self.state = AppState::Done,
-                Action::OperatorPrompt(_) => self.state = AppState::WaitingForInput,
-                _ => (),
-            }
-            if let Some(new_action) = self.op_input.update(action)? {
-                self.action_tx.send(new_action)?;
-            }
+        let Ok(action) = self.action_rx.try_recv() else {
+            return Ok(());
+        };
+
+        match action.clone() {
+            Action::TestUpdate(d) => self.update_tests(d)?,
+            Action::ExitApp => self.state = AppState::Done,
+            Action::OperatorPrompt(_) => self.state = AppState::WaitingForInput,
+            _ => (),
+        }
+        if let Some(new_action) = self.op_input.update(action)? {
+            self.action_tx.send(new_action)?;
         }
 
         Ok(())

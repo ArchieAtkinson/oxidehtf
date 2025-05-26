@@ -10,13 +10,13 @@ pub trait Component {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
         let _ = event;
         Ok(None)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let _ = action; // to appease clippy
+        let _ = action;
         Ok(None)
     }
 
