@@ -1,4 +1,5 @@
 pub(crate) mod actions;
+pub(crate) mod app;
 pub(crate) mod components;
 pub(crate) mod events;
 pub(crate) mod ui;
@@ -9,7 +10,6 @@ pub use components::test_runner::Test;
 use cli_log::*;
 use color_eyre::eyre::Result;
 use tokio::runtime::Runtime;
-use ui::Ui;
 
 #[macro_export]
 macro_rules! register_tests {
@@ -30,7 +30,7 @@ pub fn run_tests(tests: Vec<Test>) -> Result<()> {
     info!("Starting");
 
     rt.block_on(async move {
-        let mut ui = Ui::new(tests)?;
+        let mut ui = app::App::new(tests)?;
         ui.run().await
     })?;
 

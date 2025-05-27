@@ -11,7 +11,7 @@ use ratatui::{
 use tokio::sync::{mpsc, Mutex};
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, events::Event, ui::UiArea};
+use crate::{actions::Action, app::UiArea, events::Event};
 
 use super::{test_runner::TestState, Component};
 
@@ -29,28 +29,21 @@ const DEFAULT_PROMPT_TEXT: &'static str = "No Input Currently Required";
 
 pub struct Input {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
-    input_tx: mpsc::UnboundedSender<OperatorInput>,
+    event_tx: Option<mpsc::UnboundedSender<Event>>,
+    input_tx: Option<mpsc::UnboundedSender<OperatorInput>>,
     txt_input: tui_input::Input,
     prompt_text: String,
 }
 
 impl Input {
-    pub fn new(event_tx: mpsc::UnboundedSender<Event>) -> Result<Self> {
-        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
-
-        OPERATOR_COMMS
-            .set(Mutex::new(TestOperatorComms {
-                prompt_tx: event_tx,
-                operator_rx: input_rx,
-            }))
-            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
-
-        Ok(Self {
+    pub fn new() -> Self {
+        Self {
             action_tx: Default::default(),
-            input_tx,
+            event_tx: Default::default(),
+            input_tx: Default::default(),
             txt_input: Default::default(),
             prompt_text: DEFAULT_PROMPT_TEXT.to_string(),
-        })
+        }
     }
 
     pub fn request(prompt: impl Into<String>) -> Result<String> {
@@ -95,9 +88,32 @@ impl Input {
 }
 
 impl Component for Input {
+    fn init(&mut self) -> Result<()> {
+        let (input_tx, input_rx) = mpsc::unbounded_channel::<OperatorInput>();
+
+        self.input_tx = Some(input_tx);
+
+        let Some(prompt_tx) = self.event_tx.take() else {
+            return Err(eyre!("No Prompt Tx"));
+        };
+
+        OPERATOR_COMMS
+            .set(Mutex::new(TestOperatorComms {
+                prompt_tx,
+                operator_rx: input_rx,
+            }))
+            .map_err(|_| eyre!("Failed to init Operator Comms"))?;
+
+        Ok(())
+    }
+
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
+        Ok(())
+    }
 
+    fn register_event_handler(&mut self, tx: mpsc::UnboundedSender<Event>) -> Result<()> {
+        self.event_tx = Some(tx.clone());
         Ok(())
     }
 
@@ -115,7 +131,10 @@ impl Component for Input {
             }
             Action::SendInput => {
                 let input = OperatorInput(self.txt_input.value_and_reset());
-                self.input_tx.send(input)?;
+                self.input_tx
+                    .as_ref()
+                    .ok_or_eyre("Failed to get input tx")?
+                    .send(input)?;
                 Ok(None)
             }
             Action::OperatorPrompt(p) => {

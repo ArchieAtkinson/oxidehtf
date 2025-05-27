@@ -2,14 +2,22 @@ use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{actions::Action, events::Event, ui::UiArea};
+use crate::{actions::Action, app::UiArea, events::Event};
 
 pub(crate) mod operator;
 pub(crate) mod test_runner;
 
 pub trait Component {
-    fn init(&mut self) {}
+    fn init(&mut self) -> Result<()> {
+        Ok(())
+    }
+
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
+        let _ = tx;
+        Ok(())
+    }
+
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
         let _ = tx;
         Ok(())
     }

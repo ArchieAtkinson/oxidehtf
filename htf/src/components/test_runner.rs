@@ -1,5 +1,5 @@
 // use cli_log::*;
-use color_eyre::Result;
+use color_eyre::{eyre::OptionExt, Result};
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 
-use crate::{actions::Action, events::Event, ui::UiArea};
+use crate::{actions::Action, app::UiArea, events::Event};
 
 use super::Component;
 
@@ -69,23 +69,27 @@ pub enum TestState {
 pub struct TestRunner {
     tests: Vec<Test>,
     action_tx: Option<mpsc::UnboundedSender<Action>>,
-    event_tx: mpsc::UnboundedSender<Event>,
+    event_tx: Option<mpsc::UnboundedSender<Event>>,
 }
 
 impl TestRunner {
-    pub fn new(tests: Vec<Test>, event_tx: mpsc::UnboundedSender<Event>) -> Result<Self> {
-        Ok(Self {
+    pub fn new(tests: Vec<Test>) -> Self {
+        Self {
             tests,
             action_tx: None,
-            event_tx,
-        })
+            event_tx: None,
+        }
     }
 
-    pub fn test_task(&self) -> TestTask {
-        TestTask {
+    pub fn test_task(&self) -> Result<TestTask> {
+        Ok(TestTask {
             tests: self.tests.clone(),
-            tx: self.event_tx.clone(),
-        }
+            tx: self
+                .event_tx
+                .as_ref()
+                .ok_or_eyre("Failed to get event tx")?
+                .clone(),
+        })
     }
 
     fn update_tests(&mut self, data: TestMetadata) -> Result<()> {
@@ -134,23 +138,19 @@ impl TestRunner {
 }
 
 impl Component for TestRunner {
-    fn init(&mut self) {
-        let task_runner = self.test_task();
+    fn init(&mut self) -> Result<()> {
+        let task_runner = self.test_task()?;
         tokio::task::spawn_blocking(move || task_runner.run());
-    }
-
-    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
-        assert_eq!(area.test_progress.height, 3);
-
-        self.render_progress(frame, area.test_progress);
-        self.render_messages(frame, area.test_list);
-
         Ok(())
     }
 
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
+        Ok(())
+    }
 
+    fn register_event_handler(&mut self, tx: mpsc::UnboundedSender<Event>) -> Result<()> {
+        self.event_tx = Some(tx.clone());
         Ok(())
     }
 
@@ -169,5 +169,14 @@ impl Component for TestRunner {
             }
             _ => Ok(None),
         }
+    }
+
+    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
+        assert_eq!(area.test_progress.height, 3);
+
+        self.render_progress(frame, area.test_progress);
+        self.render_messages(frame, area.test_list);
+
+        Ok(())
     }
 }
