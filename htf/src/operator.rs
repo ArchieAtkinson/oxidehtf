@@ -11,7 +11,7 @@ use ratatui::{
 use tokio::sync::{mpsc, Mutex};
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, component::Component, events::Event};
+use crate::{actions::Action, component::Component, events::Event, test_runner::TestState};
 
 // Global Singleton to request input from the operator
 // by providing the prompt to show to the operator
@@ -135,6 +135,12 @@ impl Component for Input {
             }
             Action::OperatorPrompt(p) => {
                 self.prompt_text = p;
+                Ok(None)
+            }
+            Action::TestUpdate(d) => {
+                if d.state == TestState::Passed || d.state == TestState::Failed {
+                    self.prompt_text = DEFAULT_PROMPT_TEXT.into();
+                }
                 Ok(None)
             }
             _ => Ok(None),

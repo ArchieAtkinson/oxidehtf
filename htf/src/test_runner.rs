@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, LineGauge, List},
     Frame,
 };
-use tokio::sync::mpsc::{self, unbounded_channel};
+use tokio::sync::mpsc;
 
 use crate::{actions::Action, component::Component, events::Event};
 
@@ -38,7 +38,6 @@ impl TestTask {
             test.data.state = TestState::Running;
             self.tx.send(Event::TestData(test.data.clone()))?;
             let result = (test.func)();
-
             test.data.state = match result {
                 Ok(_) => TestState::Passed,
                 Err(_) => TestState::Failed,
