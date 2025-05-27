@@ -2,7 +2,7 @@ use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{actions::Action, app::UiArea, events::Event};
+use crate::{actions::Action, events::Event, ui::UiAreas};
 
 pub(crate) mod operator;
 pub(crate) mod test_runner;
@@ -32,5 +32,5 @@ pub trait Component {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()>;
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas) -> Result<()>;
 }

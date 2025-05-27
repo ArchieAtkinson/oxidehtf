@@ -1,25 +1,15 @@
-use cli_log::*;
+// use cli_log::*;
 use color_eyre::eyre::Result;
-use crossterm::event::{EventStream, KeyCode};
-use futures::StreamExt;
-use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    Frame,
-};
+use crossterm::event::KeyCode;
 use tokio::sync::mpsc;
 
 use crate::{
     actions::Action,
     components::{test_runner::TestRunner, Component},
     events::Event,
+    ui::Ui,
     Input, Test,
 };
-
-pub struct UiArea {
-    pub test_progress: Rect,
-    pub operator: Rect,
-    pub test_list: Rect,
-}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AppState {
@@ -29,6 +19,7 @@ pub enum AppState {
 }
 
 pub struct App {
+    ui: Ui,
     state: AppState,
     components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -43,6 +34,7 @@ impl App {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
 
         Ok(Self {
+            ui: Ui::new(event_tx.clone()),
             components: vec![Box::new(Input::new()), Box::new(TestRunner::new(tests))],
             state: Default::default(),
             action_rx,
@@ -59,41 +51,24 @@ impl App {
             component.init()?;
         }
 
-        let mut terminal = ratatui::init();
+        self.ui.start();
 
-        info!("Run");
-
-        while self.mode() != AppState::Done {
-            let event = self.next_event().await?;
-            self.handle_event(event)?;
+        while self.state() != AppState::Done {
+            self.handle_event().await?;
             self.handle_actions()?;
-
-            let mut result = Ok(());
-            terminal.draw(|f| result = self.view(f))?;
-            if result.is_err() {
-                return result;
-            }
+            self.ui.render(|f, a| {
+                for component in self.components.iter_mut() {
+                    component.draw(f, &a)?;
+                }
+                Ok(())
+            })?;
         }
 
-        ratatui::restore();
         Ok(())
     }
 
-    async fn next_event(&mut self) -> Result<Option<Event>> {
-        let mut events = EventStream::new();
-
-        Ok(tokio::select! {
-            crossterm = events.next() => {
-                crossterm.transpose()?.map(|e| Event::CrosstermEvent(e))
-            }
-            external = self.event_rx.recv() => {
-                external
-            }
-        })
-    }
-
-    fn handle_event(&mut self, event: Option<Event>) -> Result<()> {
-        let Some(event) = event else {
+    async fn handle_event(&mut self) -> Result<()> {
+        let Some(event) = self.event_rx.recv().await else {
             return Ok(());
         };
 
@@ -147,28 +122,7 @@ impl App {
         Ok(())
     }
 
-    fn view(&mut self, frame: &mut Frame) -> Result<()> {
-        let [test_progress, operator, test_list] = Layout::vertical([
-            Constraint::Length(3),
-            Constraint::Length(4),
-            Constraint::Min(1),
-        ])
-        .areas(frame.area());
-
-        let areas = UiArea {
-            test_progress,
-            operator,
-            test_list,
-        };
-
-        for component in self.components.iter_mut() {
-            component.draw(frame, &areas)?;
-        }
-
-        Ok(())
-    }
-
-    fn mode(&self) -> AppState {
+    fn state(&self) -> AppState {
         self.state
     }
 }

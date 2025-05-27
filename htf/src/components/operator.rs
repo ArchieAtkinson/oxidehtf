@@ -2,16 +2,15 @@ use std::sync::OnceLock;
 
 use color_eyre::eyre::{eyre, OptionExt, Result};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::Rect,
     style::Style,
-    text::ToLine,
     widgets::{Block, Paragraph},
     Frame,
 };
 use tokio::sync::{mpsc, Mutex};
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, app::UiArea, events::Event};
+use crate::{actions::Action, events::Event, ui::UiAreas};
 
 use super::{test_runner::TestState, Component};
 
@@ -62,21 +61,17 @@ impl Input {
         Ok(input)
     }
 
-    fn draw_prompt(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let help_message = self.prompt_text.to_line();
-        frame.render_widget(help_message, area);
-        Ok(())
-    }
-
     fn draw_input(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // keep 2 for borders and 1 for cursor
         let width = area.width.max(3) - 3;
         let scroll = self.txt_input.visual_scroll(width as usize);
-        let style = Style::default();
         let input = Paragraph::new(self.txt_input.value())
-            .style(style)
             .scroll((0, scroll as u16))
-            .block(Block::bordered().title("Input"));
+            .block(
+                Block::bordered()
+                    .title(self.prompt_text.clone())
+                    .title_style(Style::default().bold()),
+            );
         frame.render_widget(input, area);
 
         // Ratatui hides the cursor unless it's explicitly set. Position the  cursor past
@@ -151,14 +146,9 @@ impl Component for Input {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
-        assert_eq!(area.operator.height, 4);
-
-        let [prompt_area, input_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(area.operator);
-
-        self.draw_prompt(frame, prompt_area)?;
-        self.draw_input(frame, input_area)?;
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas) -> Result<()> {
+        assert_eq!(area.operator.height, 3);
+        self.draw_input(frame, area.operator)?;
         Ok(())
     }
 }

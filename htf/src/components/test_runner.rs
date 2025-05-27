@@ -3,12 +3,12 @@ use color_eyre::{eyre::OptionExt, Result};
 use ratatui::{
     layout::Rect,
     style::Style,
-    widgets::{Block, LineGauge, List},
+    widgets::{Block, Gauge, List},
     Frame,
 };
 use tokio::sync::mpsc;
 
-use crate::{actions::Action, app::UiArea, events::Event};
+use crate::{actions::Action, events::Event, ui::UiAreas};
 
 use super::Component;
 
@@ -114,15 +114,17 @@ impl TestRunner {
 
         let total_tests = self.tests.len() as f64;
 
-        let mut progress: f64 = tests_finished / total_tests;
+        let mut progress_ratio: f64 = tests_finished / total_tests;
         if total_tests == 0.0 {
-            progress = 0.0;
+            progress_ratio = 0.0;
         }
 
-        let bar = LineGauge::default()
-            .filled_style(Style::new().white().on_black().bold())
-            .block(Block::bordered().title("Progress"))
-            .ratio(progress);
+        let progress_percentage = (progress_ratio * 100.0) as i32;
+        let bar = Gauge::default()
+            .gauge_style(Style::new().white().on_black().bold())
+            .label(format!("Test Suite Progress {}%", progress_percentage))
+            .ratio(progress_ratio);
+
         frame.render_widget(bar, area);
     }
 
@@ -132,7 +134,11 @@ impl TestRunner {
             .iter()
             .enumerate()
             .map(|(i, test)| format!("{}: {} {:?}", i, test.data.name, test.data.state));
-        let messages = List::new(messages).block(Block::bordered().title("Messages"));
+        let messages = List::new(messages).block(
+            Block::bordered()
+                .title("Messages")
+                .title_style(Style::default().bold()),
+        );
         frame.render_widget(messages, area);
     }
 }
@@ -171,8 +177,8 @@ impl Component for TestRunner {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
-        assert_eq!(area.test_progress.height, 3);
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas) -> Result<()> {
+        assert_eq!(area.test_progress.height, 1);
 
         self.render_progress(frame, area.test_progress);
         self.render_messages(frame, area.test_list);
