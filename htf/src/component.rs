@@ -20,5 +20,5 @@ pub trait Component {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
+    fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()>;
 }

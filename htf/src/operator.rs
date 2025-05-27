@@ -141,7 +141,11 @@ impl Component for Input {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()> {
+        assert_eq!(area.len(), 1);
+        let area = area[0];
+
+        assert_eq!(area.height, 4);
         let [prompt_area, input_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(area);
 

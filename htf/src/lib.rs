@@ -5,52 +5,24 @@ pub mod operator;
 pub mod test_runner;
 pub(crate) mod ui;
 
-use crate::test_runner::{TestMetadata, TestRunner};
-use crate::ui::{AppState, Ui};
-
 use cli_log::*;
 use color_eyre::eyre::Result;
 use test_runner::Test;
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use ui::Ui;
 
 pub fn run_tests(tests: Vec<Test>) -> Result<()> {
     init_cli_log!();
 
-    let (test_data_send, test_data_recv) = mpsc::unbounded_channel::<TestMetadata>();
-
-    let mut runner = TestRunner::new(test_data_send, tests)?;
-    let mut ui = Ui::new(test_data_recv)?;
+    let mut ui = Ui::new(tests)?;
 
     let rt = Runtime::new()?;
 
-    rt.block_on(async {
-        let test_handle: JoinHandle<Result<()>> = tokio::task::spawn_blocking(move || {
-            runner.run()?;
-            Ok(())
-        });
+    info!("Starting");
 
-        let app_handle: JoinHandle<Result<()>> = tokio::spawn(async move {
-            let mut terminal = ratatui::init();
+    rt.block_on(async { tokio::spawn(async move { ui.run().await }).await? })?;
 
-            while ui.mode() != AppState::Done {
-                let event = ui.next_event().await?;
-                ui.handle_event(event)?;
-                ui.handle_actions()?;
-
-                let mut result = Ok(());
-                terminal.draw(|f| result = ui.view(f))?;
-                if result.is_err() {
-                    return result;
-                }
-            }
-            ratatui::restore();
-            Ok(())
-        });
-
-        let (_runner, _app) = tokio::join!(test_handle, app_handle);
-    });
+    info!("Finish");
 
     Ok(())
 }
