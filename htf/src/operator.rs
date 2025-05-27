@@ -13,20 +13,6 @@ use tui_input::backend::crossterm::EventHandler;
 
 use crate::{actions::Action, component::Component, events::Event, test_runner::TestState};
 
-// Global Singleton to request input from the operator
-// by providing the prompt to show to the operator
-//
-// This module "owns" the channel for receiving the input and is given
-// the sender for the prompt channel which is "owned" by the UI
-//
-// channel (OperatorPrompt) - test_to_operator
-//         - sender is used by test
-//         - recv is used by TUI (owner)
-//
-// channel (OperatorInput) - operator_to_test
-//         - sender is used by tui
-//         - revc is used by test (owner)
-
 static OPERATOR_COMMS: OnceLock<Mutex<TestOperatorComms>> = OnceLock::new();
 
 #[derive(Debug)]

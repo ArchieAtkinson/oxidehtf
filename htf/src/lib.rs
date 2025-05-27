@@ -14,13 +14,14 @@ use ui::Ui;
 pub fn run_tests(tests: Vec<Test>) -> Result<()> {
     init_cli_log!();
 
-    let mut ui = Ui::new(tests)?;
-
     let rt = Runtime::new()?;
 
     info!("Starting");
 
-    rt.block_on(async { tokio::spawn(async move { ui.run().await }).await? })?;
+    rt.block_on(async move {
+        let mut ui = Ui::new(tests)?;
+        ui.run().await
+    })?;
 
     info!("Finish");
 

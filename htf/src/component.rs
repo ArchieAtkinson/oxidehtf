@@ -5,8 +5,9 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{actions::Action, events::Event};
 
 pub trait Component {
+    fn init(&mut self) {}
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        let _ = tx; // to appease clippy
+        let _ = tx;
         Ok(())
     }
 

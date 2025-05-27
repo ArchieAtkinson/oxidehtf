@@ -19,8 +19,7 @@ use crate::{
 
 pub struct Ui {
     state: AppState,
-    test_runner: TestRunner,
-    op_input: Input,
+    components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
     event_rx: mpsc::UnboundedReceiver<Event>,
@@ -45,9 +44,8 @@ impl Ui {
         test_runner.register_action_handler(action_tx.clone())?;
 
         Ok(Self {
-            op_input,
+            components: vec![Box::new(op_input), Box::new(test_runner)],
             state: Default::default(),
-            test_runner,
             action_rx,
             action_tx,
             event_rx,
@@ -55,10 +53,12 @@ impl Ui {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let mut terminal = ratatui::init();
+        for component in self.components.iter_mut() {
+            component.register_action_handler(self.action_tx.clone())?;
+            component.init();
+        }
 
-        let task_runner = self.test_runner.test_task();
-        tokio::task::spawn_blocking(move || task_runner.run());
+        let mut terminal = ratatui::init();
 
         info!("Run");
 
@@ -119,12 +119,10 @@ impl Ui {
             _ => (),
         }
 
-        if let Some(action) = self.op_input.handle_events(event.clone())? {
-            self.action_tx.send(action)?;
-        }
-
-        if let Some(action) = self.test_runner.handle_events(event.clone())? {
-            self.action_tx.send(action)?;
+        for component in self.components.iter_mut() {
+            if let Some(action) = component.handle_events(event.clone())? {
+                self.action_tx.send(action)?;
+            }
         }
 
         Ok(())
@@ -138,12 +136,10 @@ impl Ui {
                 _ => (),
             }
 
-            if let Some(new_action) = self.op_input.update(action.clone())? {
-                self.action_tx.send(new_action)?;
-            }
-
-            if let Some(new_action) = self.test_runner.update(action.clone())? {
-                self.action_tx.send(new_action)?;
+            for component in self.components.iter_mut() {
+                if let Some(new_action) = component.update(action.clone())? {
+                    self.action_tx.send(new_action)?;
+                }
             }
         }
 
@@ -158,13 +154,14 @@ impl Ui {
         ])
         .areas(frame.area());
 
-        self.test_runner
-            .draw(frame, &[progress_area, messages_area])?;
-        self.op_input.draw(frame, &[op_area])?;
+        self.components[0].draw(frame, &[op_area])?;
+        self.components[1].draw(frame, &[progress_area, messages_area])?;
         Ok(())
     }
 
     fn mode(&self) -> AppState {
         self.state
     }
+
+    // fn layout()
 }

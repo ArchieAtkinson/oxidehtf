@@ -136,6 +136,11 @@ impl TestRunner {
 }
 
 impl Component for TestRunner {
+    fn init(&mut self) {
+        let task_runner = self.test_task();
+        tokio::task::spawn_blocking(move || task_runner.run());
+    }
+
     fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()> {
         assert_eq!(area.len(), 2);
         let [progress_bar_area, test_list_area] = area else {
