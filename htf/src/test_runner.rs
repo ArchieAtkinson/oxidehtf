@@ -1,5 +1,5 @@
-use cli_log::*;
-use color_eyre::{eyre::eyre, Result};
+// use cli_log::*;
+use color_eyre::Result;
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 
-use crate::{actions::Action, component::Component, events::Event};
+use crate::{actions::Action, component::Component, events::Event, ui::UiArea};
 
 #[macro_export]
 macro_rules! register_test {
@@ -141,14 +141,11 @@ impl Component for TestRunner {
         tokio::task::spawn_blocking(move || task_runner.run());
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()> {
-        assert_eq!(area.len(), 2);
-        let [progress_bar_area, test_list_area] = area else {
-            return Err(eyre!("Invalid area slice for test runner"));
-        };
+    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
+        assert_eq!(area.test_progress.height, 3);
 
-        self.render_progress(frame, *progress_bar_area);
-        self.render_messages(frame, *test_list_area);
+        self.render_progress(frame, area.test_progress);
+        self.render_messages(frame, area.test_list);
 
         Ok(())
     }

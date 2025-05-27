@@ -11,7 +11,9 @@ use ratatui::{
 use tokio::sync::{mpsc, Mutex};
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, component::Component, events::Event, test_runner::TestState};
+use crate::{
+    actions::Action, component::Component, events::Event, test_runner::TestState, ui::UiArea,
+};
 
 static OPERATOR_COMMS: OnceLock<Mutex<TestOperatorComms>> = OnceLock::new();
 
@@ -133,13 +135,11 @@ impl Component for Input {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()> {
-        assert_eq!(area.len(), 1);
-        let area = area[0];
+    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()> {
+        assert_eq!(area.operator.height, 4);
 
-        assert_eq!(area.height, 4);
         let [prompt_area, input_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(area);
+            Layout::vertical([Constraint::Length(1), Constraint::Length(3)]).areas(area.operator);
 
         self.draw_prompt(frame, prompt_area)?;
         self.draw_input(frame, input_area)?;

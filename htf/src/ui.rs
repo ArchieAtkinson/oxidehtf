@@ -4,7 +4,7 @@ use crossterm::event::EventStream;
 use futures::StreamExt;
 use ratatui::{
     crossterm::event::KeyCode,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     Frame,
 };
 use tokio::sync::mpsc;
@@ -16,6 +16,12 @@ use crate::{
     operator::Input,
     test_runner::{Test, TestRunner},
 };
+
+pub struct UiArea {
+    pub test_progress: Rect,
+    pub operator: Rect,
+    pub test_list: Rect,
+}
 
 pub struct Ui {
     state: AppState,
@@ -147,21 +153,27 @@ impl Ui {
     }
 
     fn view(&mut self, frame: &mut Frame) -> Result<()> {
-        let [progress_area, op_area, messages_area] = Layout::vertical([
+        let [test_progress, operator, test_list] = Layout::vertical([
             Constraint::Length(3),
             Constraint::Length(4),
             Constraint::Min(1),
         ])
         .areas(frame.area());
 
-        self.components[0].draw(frame, &[op_area])?;
-        self.components[1].draw(frame, &[progress_area, messages_area])?;
+        let areas = UiArea {
+            test_progress,
+            operator,
+            test_list,
+        };
+
+        for component in self.components.iter_mut() {
+            component.draw(frame, &areas)?;
+        }
+
         Ok(())
     }
 
     fn mode(&self) -> AppState {
         self.state
     }
-
-    // fn layout()
 }

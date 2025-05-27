@@ -1,8 +1,8 @@
 use color_eyre::Result;
-use ratatui::{layout::Rect, Frame};
+use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{actions::Action, events::Event};
+use crate::{actions::Action, events::Event, ui::UiArea};
 
 pub trait Component {
     fn init(&mut self) {}
@@ -21,5 +21,5 @@ pub trait Component {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &[Rect]) -> Result<()>;
+    fn draw(&mut self, frame: &mut Frame, area: &UiArea) -> Result<()>;
 }
