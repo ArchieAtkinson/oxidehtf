@@ -8,24 +8,9 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 
-use crate::{actions::Action, component::Component, events::Event, ui::UiArea};
+use crate::{actions::Action, events::Event, ui::UiArea};
 
-#[macro_export]
-macro_rules! register_test {
-    ($($func_name:ident),*) => {
-        vec![
-            $(
-                htf::test_runner::Test {
-                    func: $func_name,
-                    data: htf::test_runner::TestMetadata {
-                        name: stringify!($func_name),
-                        state: htf::test_runner::TestState::Waiting,
-                    },
-                }
-            ),*
-        ]
-    };
-}
+use super::Component;
 
 pub struct TestTask {
     tests: Vec<Test>,
@@ -54,14 +39,27 @@ pub struct Test {
     pub data: TestMetadata,
 }
 
+impl Test {
+    pub fn new(func: fn() -> Result<()>, name: &'static str) -> Self {
+        Self {
+            func,
+            data: TestMetadata {
+                name,
+                state: Default::default(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub enum TestState {
+    #[default]
     Waiting,
     Running,
     Passed,

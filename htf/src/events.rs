@@ -1,4 +1,4 @@
-use crate::test_runner::TestMetadata;
+use crate::components::test_runner::TestMetadata;
 
 #[derive(Debug, Clone)]
 pub enum Event {

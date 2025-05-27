@@ -4,6 +4,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{actions::Action, events::Event, ui::UiArea};
 
+pub(crate) mod operator;
+pub(crate) mod test_runner;
+
 pub trait Component {
     fn init(&mut self) {}
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {

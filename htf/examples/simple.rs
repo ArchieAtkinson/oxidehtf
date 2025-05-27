@@ -1,7 +1,7 @@
 use cli_log::*;
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
-use htf::operator::Input;
+use htf::Input;
 
 fn test1() -> Result<()> {
     info!("Waiting");
@@ -46,6 +46,6 @@ fn test6() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let tests = htf::register_test!(test1, test2, test3, test4, test5, test6);
+    let tests = htf::register_tests!(test1, test2, test3, test4, test5, test6);
     htf::run_tests(tests)
 }

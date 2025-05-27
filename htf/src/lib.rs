@@ -1,15 +1,26 @@
 pub(crate) mod actions;
-pub(crate) mod component;
+pub(crate) mod components;
 pub(crate) mod events;
-pub mod operator;
-pub mod test_runner;
 pub(crate) mod ui;
+
+pub use components::operator::Input;
+pub use components::test_runner::Test;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
-use test_runner::Test;
 use tokio::runtime::Runtime;
 use ui::Ui;
+
+#[macro_export]
+macro_rules! register_tests {
+    ($($func_name:ident),*) => {
+        vec![
+            $(
+            htf::Test::new($func_name, stringify!($func_name))
+            ),*
+        ]
+    };
+}
 
 pub fn run_tests(tests: Vec<Test>) -> Result<()> {
     init_cli_log!();

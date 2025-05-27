@@ -11,14 +11,11 @@ use ratatui::{
 use tokio::sync::{mpsc, Mutex};
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{
-    actions::Action, component::Component, events::Event, test_runner::TestState, ui::UiArea,
-};
+use crate::{actions::Action, events::Event, ui::UiArea};
+
+use super::{test_runner::TestState, Component};
 
 static OPERATOR_COMMS: OnceLock<Mutex<TestOperatorComms>> = OnceLock::new();
-
-#[derive(Debug)]
-pub struct OperatorPrompt(pub String);
 
 #[derive(Debug)]
 pub struct OperatorInput(pub String);

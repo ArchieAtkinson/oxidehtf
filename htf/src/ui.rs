@@ -11,10 +11,12 @@ use tokio::sync::mpsc;
 
 use crate::{
     actions::Action,
-    component::Component,
+    components::{
+        operator::Input,
+        test_runner::{Test, TestRunner},
+        Component,
+    },
     events::Event,
-    operator::Input,
-    test_runner::{Test, TestRunner},
 };
 
 pub struct UiArea {
