@@ -51,8 +51,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let tests = vec![
                 #(#test_functions_pointers),*
             ];
-            // htf::run_tests(tests)
-            Ok(())
+            htf::run_tests(tests)
         }
     };
 

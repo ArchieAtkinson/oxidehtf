@@ -135,8 +135,7 @@ impl TestRunner {
             .filter(|test| {
                 test.data.state == TestState::Waiting || test.data.state == TestState::Running
             })
-            .enumerate()
-            .map(|(i, test)| format!("{}: {} {:?}", i + 1, test.data.name, test.data.state));
+            .map(|test| format!("{} {:?}", test.data.name, test.data.state));
         let messages = List::new(messages).block(
             Block::bordered()
                 .title("Upcoming Tests")
@@ -152,8 +151,8 @@ impl TestRunner {
             .filter(|test| {
                 test.data.state == TestState::Passed || test.data.state == TestState::Failed
             })
-            .enumerate()
-            .map(|(i, test)| format!("{}: {} {:?}", i + 1, test.data.name, test.data.state));
+            .rev()
+            .map(|test| format!("{} {:?}", test.data.name, test.data.state));
         let messages = List::new(messages).block(
             Block::bordered()
                 .title("Completed Tests")
