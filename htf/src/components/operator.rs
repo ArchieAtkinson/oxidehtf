@@ -120,7 +120,7 @@ impl Component for Input {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::OperatorInput(e) => {
+            Action::TerminalInput(e) => {
                 let _ = self.txt_input.handle_event(&e);
                 Ok(None)
             }

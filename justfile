@@ -1,5 +1,5 @@
-example: 
-    HTF_LOG=debug cargo run --package htf --example simple
+example name:
+    HTF_LOG=debug cargo run --package htf --example {{ name }}
 
 log:
     tail -f htf.log

@@ -88,7 +88,7 @@ impl App {
 
                 if self.state == AppState::WaitingForInput {
                     self.action_tx
-                        .send(Action::OperatorInput(crossterm_event))?;
+                        .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
             Event::OperatorPrompt(p) => self.action_tx.send(Action::OperatorPrompt(p))?,
