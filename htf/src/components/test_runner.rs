@@ -1,7 +1,7 @@
 // use cli_log::*;
 use color_eyre::{eyre::OptionExt, Result};
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     style::Style,
     widgets::{Block, Gauge, List},
     Frame,
@@ -122,21 +122,41 @@ impl TestRunner {
         let progress_percentage = (progress_ratio * 100.0) as i32;
         let bar = Gauge::default()
             .gauge_style(Style::new().white().on_black().bold())
-            .label(format!("Test Suite Progress {}%", progress_percentage))
+            .label(format!("Test Suite Progress: {}%", progress_percentage))
             .ratio(progress_ratio);
 
         frame.render_widget(bar, area);
     }
 
-    fn render_messages(&self, frame: &mut Frame, area: Rect) {
+    fn render_waiting_tests(&self, frame: &mut Frame, area: Rect) {
         let messages = self
             .tests
             .iter()
+            .filter(|test| {
+                test.data.state == TestState::Waiting || test.data.state == TestState::Running
+            })
             .enumerate()
-            .map(|(i, test)| format!("{}: {} {:?}", i, test.data.name, test.data.state));
+            .map(|(i, test)| format!("{}: {} {:?}", i + 1, test.data.name, test.data.state));
         let messages = List::new(messages).block(
             Block::bordered()
-                .title("Messages")
+                .title("Upcoming Tests")
+                .title_style(Style::default().bold()),
+        );
+        frame.render_widget(messages, area);
+    }
+
+    fn render_completed_tests(&self, frame: &mut Frame, area: Rect) {
+        let messages = self
+            .tests
+            .iter()
+            .filter(|test| {
+                test.data.state == TestState::Passed || test.data.state == TestState::Failed
+            })
+            .enumerate()
+            .map(|(i, test)| format!("{}: {} {:?}", i + 1, test.data.name, test.data.state));
+        let messages = List::new(messages).block(
+            Block::bordered()
+                .title("Completed Tests")
                 .title_style(Style::default().bold()),
         );
         frame.render_widget(messages, area);
@@ -181,7 +201,13 @@ impl Component for TestRunner {
         assert_eq!(area.test_progress.height, 1);
 
         self.render_progress(frame, area.test_progress);
-        self.render_messages(frame, area.test_list);
+
+        let [completed_area, waiting_area] =
+            Layout::horizontal([Constraint::Ratio(2, 3), Constraint::Ratio(1, 3)])
+                .areas(area.test_list);
+
+        self.render_completed_tests(frame, completed_area);
+        self.render_waiting_tests(frame, waiting_area);
 
         Ok(())
     }

@@ -3,3 +3,6 @@ example:
 
 log:
     tail -f htf.log
+
+init:
+    cargo install cargo-expand
