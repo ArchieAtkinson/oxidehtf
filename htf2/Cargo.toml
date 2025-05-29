@@ -1,5 +1,5 @@
 [package]
-name = "htf"
+name = "htf2"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,6 +12,7 @@ ratatui = { version = "0.30.0-alpha.2", features = ["all-widgets", "crossterm"] 
 tokio = { version = "1.45.0", features = ["full"] }
 tui-input = "0.12.1"
 macros= { path = "../macros" }
+async-trait = "0.1.88"
 
 [dev-dependencies]
 

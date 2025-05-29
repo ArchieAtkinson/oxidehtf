@@ -1,12 +1,38 @@
-# Envoy
-
-Envoy is collection of examples, snippets and tools targeted for the Embassy Rust Project.
-
-## Broadcast
-
-`envoy::broadcast` is a alternative to `embassy_sync::PubSub`, where each subscribers has its own queue instead of a shared queue for the enitire channel.
+# HTuiF
 
 
-## Enum Channel
+TODO:
 
-`envoy::enum_channel` similar to `envoy::broadcast`. However this messaging system uses enums to allow a single receiver to `.await` on messages from multiple different channels that produces types present in the receivers's enum.  
+Split out the test runner from the UI components
+Create a test context system to allow "plugs" to be passed into tests
+Change input into a plug.
+
+example
+```rust
+// Current
+
+#[test]
+fn test1() -> Result<()> {
+    let value = Input::request("Test 1 Input:");
+    info!("{:?}", value);
+    Ok(())
+}
+
+// to
+
+struct TestContext {
+  user_input: UserInput;
+}
+
+#[test]
+fn test1(context: &mut TestContext) -> Result<()> {
+    let value = context.input.request("Test 1 Input:");
+    info!("{:?}", value);
+    Ok(())
+}
+```
+
+Things to work out.
+- How is TextContext constructed?
+- Implement so kind of TestLifecycle trait that provides setup, teardown etc that can be implemented for "plugs"
+- Comms between the "plugs" and the UI

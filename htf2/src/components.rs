@@ -1,11 +1,10 @@
+use crate::{actions::Action, events::Event, test_runner::TestRunnerState, ui::UiAreas};
 use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{actions::Action, events::Event, ui::UiAreas};
-
-pub(crate) mod operator;
-pub(crate) mod test_runner;
+pub(crate) mod test_status;
+pub(crate) mod user_text_input;
 
 pub trait Component {
     fn init(&mut self) -> Result<()> {
@@ -32,5 +31,5 @@ pub trait Component {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas) -> Result<()>;
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &TestRunnerState) -> Result<()>;
 }

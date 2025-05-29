@@ -2,10 +2,12 @@ pub(crate) mod actions;
 pub(crate) mod app;
 pub(crate) mod components;
 pub(crate) mod events;
+pub(crate) mod test_runner;
 pub(crate) mod ui;
 
-pub use components::operator::Input;
-pub use components::test_runner::Test;
+pub use test_runner::user_text_input::TextInput;
+pub use test_runner::Test;
+pub use test_runner::TestContext;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
@@ -16,7 +18,7 @@ macro_rules! register_tests {
     ($($func_name:ident),*) => {
         vec![
             $(
-            htf::Test::new($func_name, stringify!($func_name))
+            htf2::Test::new($func_name, stringify!($func_name))
             ),*
         ]
     };

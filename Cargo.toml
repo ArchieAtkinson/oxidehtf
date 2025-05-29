@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "htf",
-  "macros"
+  "macros",
+  "htf2"
 ]
 resolver = "2"
 
