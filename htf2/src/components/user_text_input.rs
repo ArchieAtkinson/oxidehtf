@@ -8,7 +8,7 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, events::Event, test_runner::TestRunnerState, ui::UiAreas};
+use crate::{actions::Action, events::Event, test_runner::TestData, ui::UiAreas};
 
 use super::Component;
 
@@ -29,10 +29,9 @@ impl UserTextInput {
         }
     }
 
-    fn draw_input(&mut self, frame: &mut Frame, area: Rect, state: &TestRunnerState) -> Result<()> {
-        let current_index = state.current_index;
-        let prompt = state.tests[current_index]
-            .data
+    fn draw_input(&mut self, frame: &mut Frame, area: Rect, data: &TestData) -> Result<()> {
+        let current_index = data.current_index;
+        let prompt = data[current_index]
             .user_inputs
             .last()
             .map_or(DEFAULT_PROMPT_TEXT.into(), |i| i.prompt.clone());
@@ -93,9 +92,9 @@ impl Component for UserTextInput {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &TestRunnerState) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
         assert_eq!(area.operator.height, 3);
-        self.draw_input(frame, area.operator, state)?;
+        self.draw_input(frame, area.operator, data)?;
 
         Ok(())
     }

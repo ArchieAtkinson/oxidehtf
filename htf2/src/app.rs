@@ -9,7 +9,7 @@ use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
     events::Event,
-    test_runner::{Test, TestRunner, TestRunnerState},
+    test_runner::{TestData, TestFunctions, TestRunner},
     ui::Ui,
 };
 
@@ -23,7 +23,8 @@ pub enum AppState {
 pub struct App {
     ui: Ui,
     state: AppState,
-    test_runner_state: Arc<RwLock<TestRunnerState>>,
+    test_data: Arc<RwLock<TestData>>,
+    test_funcs: TestFunctions,
     components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -34,16 +35,15 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tests: Vec<Test>) -> Result<Self> {
+    pub fn new(funcs: TestFunctions, data: TestData) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let (input_tx, input_rx) = mpsc::unbounded_channel();
 
-        let test_runner_state = Arc::new(RwLock::new(TestRunnerState::new(tests)));
-
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
-            test_runner_state: test_runner_state.clone(),
+            test_data: Arc::new(RwLock::new(data)),
+            test_funcs: funcs,
             components: vec![
                 Box::new(TestStatusDisplay::new()),
                 Box::new(UserTextInput::new()),
@@ -68,8 +68,11 @@ impl App {
         self.ui.start();
 
         // TODO: Handle Errors
-        let mut test_runner =
-            TestRunner::new(self.test_runner_state.clone(), self.event_tx.clone());
+        let mut test_runner = TestRunner::new(
+            self.test_funcs.clone(),
+            self.test_data.clone(),
+            self.event_tx.clone(),
+        );
 
         info!("Spawning Test Runner");
 
@@ -80,7 +83,7 @@ impl App {
         while self.state() != AppState::Done {
             self.handle_event().await?;
             self.handle_actions().await?;
-            let state = self.test_runner_state.read().await;
+            let state = self.test_data.read().await;
             self.ui.render(|f, a| {
                 for component in self.components.iter_mut() {
                     component.draw(f, &a, &state)?;

@@ -11,10 +11,9 @@ use tokio::sync::mpsc;
 use crate::{
     actions::Action,
     events::Event,
-    test_runner::{TestRunnerState, TestState},
+    test_runner::{TestData, TestState},
     ui::UiAreas,
 };
-use indoc::formatdoc;
 
 use super::Component;
 
@@ -31,17 +30,16 @@ impl TestStatusDisplay {
         }
     }
 
-    fn render_progress(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
-        let tests_finished = state
-            .tests
+    fn render_progress(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+        let tests_finished = data
             .iter()
-            .filter(|test| match test.data.state {
+            .filter(|test| match test.state {
                 TestState::Done(_) => true,
                 _ => false,
             })
             .count() as f64;
 
-        let total_tests = state.tests.len() as f64;
+        let total_tests = data.len() as f64;
 
         let mut progress_ratio: f64 = tests_finished / total_tests;
         if total_tests == 0.0 {
@@ -57,15 +55,15 @@ impl TestStatusDisplay {
         frame.render_widget(bar, area);
     }
 
-    fn render_current_test(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
-        let current_test = state.tests.iter().find(|t| match t.data.state {
+    fn render_current_test(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+        let current_test = data.iter().find(|t| match t.state {
             TestState::Running(_) => true,
             _ => false,
         });
 
         let text = {
             if let Some(current_test) = current_test {
-                let data = current_test.data.clone();
+                let data = current_test.clone();
                 format!("{} - {:?}", data.name, data.state)
             } else {
                 "No Running Test".into()
@@ -80,15 +78,14 @@ impl TestStatusDisplay {
         frame.render_widget(test, area);
     }
 
-    fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
-        let waiting_tests = state
-            .tests
+    fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+        let waiting_tests = data
             .iter()
-            .filter(|test| match test.data.state {
+            .filter(|test| match test.state {
                 TestState::InQueue | TestState::Running(_) => true,
                 _ => false,
             })
-            .map(|test| format!("{} - {:?}", test.data.name, test.data.state));
+            .map(|test| format!("{} - {:?}", test.name, test.state));
 
         let test_list = List::new(waiting_tests).block(
             Block::bordered()
@@ -99,16 +96,15 @@ impl TestStatusDisplay {
         frame.render_widget(test_list, area);
     }
 
-    fn render_completed_tests(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
-        let completed_tests = state
-            .tests
+    fn render_completed_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+        let completed_tests = data
             .iter()
-            .filter(|test| match test.data.state {
+            .filter(|test| match test.state {
                 TestState::Done(_) => true,
                 _ => false,
             })
             .rev()
-            .map(|test| format!("{} - {:?}", test.data.name, test.data.state));
+            .map(|test| format!("{} - {:?}", test.name, test.state));
 
         let test_list = List::new(completed_tests).block(
             Block::bordered()
@@ -147,22 +143,22 @@ impl Component for TestStatusDisplay {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &TestRunnerState) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
         assert_eq!(area.test_progress.height, 1);
 
-        self.render_progress(frame, area.test_progress, state);
+        self.render_progress(frame, area.test_progress, data);
 
         let [current_test, list_tests] =
             Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(area.test_display);
 
-        self.render_current_test(frame, current_test, state);
+        self.render_current_test(frame, current_test, data);
 
         let [completed_area, waiting_area] =
             Layout::horizontal([Constraint::Ratio(3, 5), Constraint::Ratio(2, 5)])
                 .areas(list_tests);
 
-        self.render_completed_tests(frame, completed_area, state);
-        self.render_waiting_tests(frame, waiting_area, state);
+        self.render_completed_tests(frame, completed_area, data);
+        self.render_waiting_tests(frame, waiting_area, data);
 
         Ok(())
     }

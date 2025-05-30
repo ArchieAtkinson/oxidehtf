@@ -16,6 +16,7 @@ fn test1(context: &mut TestContext) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let tests = htf2::register_tests!(test1);
-    htf2::run_tests(tests)
+    let (funcs, data) = htf2::register_tests!(test1);
+
+    htf2::run_tests(funcs, data)
 }
