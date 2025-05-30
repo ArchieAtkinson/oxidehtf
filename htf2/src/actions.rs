@@ -3,5 +3,5 @@ pub enum Action {
     TerminalInput(crossterm::event::Event),
     SendInput,
     ExitApp,
-    SetCurrentTestInput(String),
+    OperatorTextInput(String),
 }

@@ -35,9 +35,7 @@ impl UserTextInput {
             .data
             .user_input
             .last()
-            .unwrap_or(&(DEFAULT_PROMPT_TEXT.into(), "".into()))
-            .0
-            .clone();
+            .map_or(DEFAULT_PROMPT_TEXT.into(), |i| i.prompt.clone());
 
         // keep 2 for borders and 1 for cursor
         let width = area.width.max(3) - 3;
@@ -86,7 +84,7 @@ impl Component for UserTextInput {
                 let _ = self.txt_input.handle_event(&e);
             }
             Action::SendInput => {
-                return Ok(Some(Action::SetCurrentTestInput(
+                return Ok(Some(Action::OperatorTextInput(
                     self.txt_input.value_and_reset(),
                 )));
             }

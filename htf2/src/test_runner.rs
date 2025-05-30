@@ -46,10 +46,25 @@ impl Test {
 }
 
 #[derive(Debug, Clone)]
+pub struct UserInput {
+    pub prompt: String,
+    pub input: String,
+}
+
+impl UserInput {
+    pub fn new(prompt: impl Into<String>) -> Self {
+        Self {
+            prompt: prompt.into(),
+            input: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
-    pub user_input: Vec<(String, String)>,
+    pub user_input: Vec<UserInput>,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -74,7 +89,7 @@ impl TestRunner {
         Self { state, event_tx }
     }
 
-    pub fn run(&mut self, input_rx: mpsc::UnboundedReceiver<()>) -> Result<()> {
+    pub fn run(&mut self, input_rx: mpsc::UnboundedReceiver<String>) -> Result<()> {
         info!("Starting Test Runner");
         let num_tests = self.state.blocking_read().tests.len();
 

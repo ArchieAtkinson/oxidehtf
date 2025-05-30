@@ -29,8 +29,8 @@ pub struct App {
     action_tx: mpsc::UnboundedSender<Action>,
     event_rx: mpsc::UnboundedReceiver<Event>,
     event_tx: mpsc::UnboundedSender<Event>,
-    input_rx: Option<mpsc::UnboundedReceiver<()>>,
-    input_tx: mpsc::UnboundedSender<()>,
+    input_rx: Option<mpsc::UnboundedReceiver<String>>,
+    input_tx: mpsc::UnboundedSender<String>,
 }
 
 impl App {
@@ -132,16 +132,8 @@ impl App {
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 Action::ExitApp => self.state = AppState::Done,
-                Action::SetCurrentTestInput(s) => {
-                    let mut lock = self.test_runner_state.write().await;
-                    let current_index = lock.current_index;
-                    let user_input = &mut lock.tests[current_index]
-                        .data
-                        .user_input
-                        .last_mut()
-                        .ok_or_eyre("No user input")?;
-                    user_input.1 = s;
-                    self.input_tx.send(())?;
+                Action::OperatorTextInput(s) => {
+                    self.input_tx.send(s)?;
                 }
                 _ => (),
             }

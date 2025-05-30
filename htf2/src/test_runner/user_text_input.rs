@@ -9,19 +9,19 @@ use super::TestRunnerState;
 pub struct TextInput {
     state: Arc<RwLock<TestRunnerState>>,
     event_tx: mpsc::UnboundedSender<Event>,
-    input_alert: mpsc::UnboundedReceiver<()>,
+    input_tx: mpsc::UnboundedReceiver<String>,
 }
 
 impl TextInput {
     pub fn new(
         state: Arc<RwLock<TestRunnerState>>,
         event_tx: mpsc::UnboundedSender<Event>,
-        input_alert: mpsc::UnboundedReceiver<()>,
+        input_tx: mpsc::UnboundedReceiver<String>,
     ) -> Self {
         Self {
             state,
             event_tx,
-            input_alert,
+            input_tx,
         }
     }
 
@@ -32,23 +32,23 @@ impl TextInput {
             lock.tests[current_index]
                 .data
                 .user_input
-                .push((prompt.into(), "".into()));
+                .push(super::UserInput::new(prompt));
 
             self.event_tx
                 .send(Event::UpdatedTestRunnerState)
                 .expect("Oops");
         }
 
-        self.input_alert.blocking_recv();
+        let input = self.input_tx.blocking_recv().expect("Failed to get input");
 
-        let lock = self.state.blocking_read();
+        let mut lock = self.state.blocking_write();
         let current_index = lock.current_index;
         lock.tests[current_index]
             .data
             .user_input
-            .last()
+            .last_mut()
             .expect("Should be populated")
-            .1
-            .clone()
+            .input = input.clone();
+        input
     }
 }
