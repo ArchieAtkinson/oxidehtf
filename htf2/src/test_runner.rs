@@ -11,11 +11,7 @@ use crate::{events::Event, TextInput};
 
 pub(crate) mod user_text_input;
 
-pub type FuncType = fn(&mut TestContext) -> Result<()>;
-
-pub struct TestContext {
-    pub text_input: TextInput,
-}
+pub type FuncType<T> = fn(&mut T) -> Result<()>;
 
 #[derive(Debug, Clone)]
 pub struct TestData {
@@ -31,8 +27,8 @@ pub struct TestMetadata {
 }
 
 #[derive(Debug, Clone)]
-pub struct TestFunctions {
-    pub funcs: Vec<FuncType>,
+pub struct TestFunctions<T> {
+    pub funcs: Vec<FuncType<T>>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,22 +68,25 @@ pub enum TestState {
     Done(TestDone),
 }
 
-pub struct TestRunner {
+pub struct TestRunner<T> {
     data: Arc<RwLock<TestData>>,
-    funcs: TestFunctions,
+    funcs: TestFunctions<T>,
     event_tx: mpsc::UnboundedSender<Event>,
+    context: T,
 }
 
-impl TestRunner {
+impl<T> TestRunner<T> {
     pub fn new(
-        funcs: TestFunctions,
+        funcs: TestFunctions<T>,
         data: Arc<RwLock<TestData>>,
         event_tx: mpsc::UnboundedSender<Event>,
+        context: T,
     ) -> Self {
         Self {
             data,
             funcs,
             event_tx,
+            context,
         }
     }
 
@@ -97,16 +96,16 @@ impl TestRunner {
 
         info!("Loop");
 
-        let mut context = TestContext {
-            text_input: TextInput::new(self.data.clone(), self.event_tx.clone(), input_rx),
-        };
+        // let mut context = TestContext {
+        //     text_input: TextInput::new(self.data.clone(), self.event_tx.clone(), input_rx),
+        // };
 
         for index in 0..num_tests {
             self.data.blocking_write().data[index].state = TestState::Running(TestRunning::Running);
 
             self.event_tx.send(Event::UpdatedTestData)?;
 
-            let result = (self.funcs[index])(&mut context);
+            let result = (self.funcs.funcs[index])(&mut self.context);
 
             self.data.blocking_write()[index].state = match result {
                 Ok(_) => TestState::Done(TestDone::Passed),
@@ -133,19 +132,5 @@ impl Deref for TestData {
 impl DerefMut for TestData {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
-    }
-}
-
-impl Deref for TestFunctions {
-    type Target = Vec<FuncType>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.funcs
-    }
-}
-
-impl DerefMut for TestFunctions {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.funcs
     }
 }

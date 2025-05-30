@@ -6,7 +6,6 @@ pub(crate) mod test_runner;
 pub(crate) mod ui;
 
 pub use test_runner::user_text_input::TextInput;
-pub use test_runner::TestContext;
 
 use test_runner::{FuncType, TestData, TestFunctions, TestMetadata, TestState};
 
@@ -14,7 +13,10 @@ use cli_log::*;
 use color_eyre::eyre::Result;
 use tokio::runtime::Runtime;
 
-pub fn gen_test_data(funcs: Vec<FuncType>, names: Vec<&'static str>) -> (TestFunctions, TestData) {
+pub fn gen_test_data<T>(
+    funcs: Vec<FuncType<T>>,
+    names: Vec<&'static str>,
+) -> (TestFunctions<T>, TestData) {
     let test_funcs = TestFunctions { funcs };
 
     let test_data = TestData {
@@ -42,7 +44,11 @@ macro_rules! register_tests {
     };
 }
 
-pub fn run_tests(funcs: TestFunctions, data: TestData) -> Result<()> {
+pub fn run_tests<T: Send + 'static>(
+    funcs: TestFunctions<T>,
+    data: TestData,
+    context: T,
+) -> Result<()> {
     init_cli_log!();
 
     let rt = Runtime::new()?;
@@ -50,7 +56,7 @@ pub fn run_tests(funcs: TestFunctions, data: TestData) -> Result<()> {
     info!("Starting");
 
     rt.block_on(async move {
-        let mut ui = app::App::new(funcs, data)?;
+        let mut ui = app::App::new(funcs, data, context)?;
         ui.run().await
     })?;
 

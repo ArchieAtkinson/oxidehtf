@@ -20,11 +20,12 @@ pub enum AppState {
     Done,
 }
 
-pub struct App {
+pub struct App<T: Send + 'static> {
     ui: Ui,
     state: AppState,
     test_data: Arc<RwLock<TestData>>,
-    test_funcs: TestFunctions,
+    test_funcs: Option<TestFunctions<T>>,
+    test_context: Option<T>,
     components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -34,8 +35,8 @@ pub struct App {
     input_tx: mpsc::UnboundedSender<String>,
 }
 
-impl App {
-    pub fn new(funcs: TestFunctions, data: TestData) -> Result<Self> {
+impl<T: Send + 'static> App<T> {
+    pub fn new(funcs: TestFunctions<T>, data: TestData, test_context: T) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let (input_tx, input_rx) = mpsc::unbounded_channel();
@@ -43,7 +44,8 @@ impl App {
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
             test_data: Arc::new(RwLock::new(data)),
-            test_funcs: funcs,
+            test_funcs: Some(funcs),
+            test_context: Some(test_context),
             components: vec![
                 Box::new(TestStatusDisplay::new()),
                 Box::new(UserTextInput::new()),
@@ -69,9 +71,12 @@ impl App {
 
         // TODO: Handle Errors
         let mut test_runner = TestRunner::new(
-            self.test_funcs.clone(),
+            self.test_funcs.take().expect("Failed to Test Functions"),
             self.test_data.clone(),
             self.event_tx.clone(),
+            self.test_context
+                .take()
+                .expect("Failed to get Test Context"),
         );
 
         info!("Spawning Test Runner");
