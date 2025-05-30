@@ -7,9 +7,7 @@ use cli_log::*;
 use color_eyre::Result;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::{events::Event, TextInput};
-
-pub(crate) mod user_text_input;
+use crate::{events::Event, plugs::user_text_input::UserInput};
 
 pub type FuncType<T> = fn(&mut T) -> Result<()>;
 
@@ -29,21 +27,6 @@ pub struct TestMetadata {
 #[derive(Debug, Clone)]
 pub struct TestFunctions<T> {
     pub funcs: Vec<FuncType<T>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct UserInput {
-    pub prompt: String,
-    pub input: String,
-}
-
-impl UserInput {
-    pub fn new(prompt: impl Into<String>) -> Self {
-        Self {
-            prompt: prompt.into(),
-            input: Default::default(),
-        }
-    }
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -90,15 +73,11 @@ impl<T> TestRunner<T> {
         }
     }
 
-    pub fn run(&mut self, input_rx: mpsc::UnboundedReceiver<String>) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
         let num_tests = self.data.blocking_read().data.len();
 
         info!("Loop");
-
-        // let mut context = TestContext {
-        //     text_input: TextInput::new(self.data.clone(), self.event_tx.clone(), input_rx),
-        // };
 
         for index in 0..num_tests {
             self.data.blocking_write().data[index].state = TestState::Running(TestRunning::Running);

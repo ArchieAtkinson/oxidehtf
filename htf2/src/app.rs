@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use cli_log::*;
-use color_eyre::eyre::{OptionExt, Result};
+use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, Mutex, RwLock};
 
 use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
     events::Event,
-    test_runner::{TestData, TestFunctions, TestRunner},
+    plugs::user_text_input::{UserInput, USER_INPUT_RX},
+    test_runner::TestData,
     ui::Ui,
 };
 
@@ -20,32 +21,35 @@ pub enum AppState {
     Done,
 }
 
-pub struct App<T: Send + 'static> {
+pub struct App {
     ui: Ui,
     state: AppState,
     test_data: Arc<RwLock<TestData>>,
-    test_funcs: Option<TestFunctions<T>>,
-    test_context: Option<T>,
     components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
     event_rx: mpsc::UnboundedReceiver<Event>,
     event_tx: mpsc::UnboundedSender<Event>,
-    input_rx: Option<mpsc::UnboundedReceiver<String>>,
     input_tx: mpsc::UnboundedSender<String>,
 }
 
-impl<T: Send + 'static> App<T> {
-    pub fn new(funcs: TestFunctions<T>, data: TestData, test_context: T) -> Result<Self> {
+impl App {
+    pub fn new(
+        data: Arc<RwLock<TestData>>,
+        event_rx: mpsc::UnboundedReceiver<Event>,
+        event_tx: mpsc::UnboundedSender<Event>,
+    ) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
+
         let (input_tx, input_rx) = mpsc::unbounded_channel();
+
+        USER_INPUT_RX
+            .set(Mutex::new(input_rx))
+            .expect("Failed to set User Input Rx");
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
-            test_data: Arc::new(RwLock::new(data)),
-            test_funcs: Some(funcs),
-            test_context: Some(test_context),
+            test_data: data,
             components: vec![
                 Box::new(TestStatusDisplay::new()),
                 Box::new(UserTextInput::new()),
@@ -55,7 +59,6 @@ impl<T: Send + 'static> App<T> {
             action_tx,
             event_rx,
             event_tx,
-            input_rx: Some(input_rx),
             input_tx,
         })
     }
@@ -69,21 +72,7 @@ impl<T: Send + 'static> App<T> {
 
         self.ui.start();
 
-        // TODO: Handle Errors
-        let mut test_runner = TestRunner::new(
-            self.test_funcs.take().expect("Failed to Test Functions"),
-            self.test_data.clone(),
-            self.event_tx.clone(),
-            self.test_context
-                .take()
-                .expect("Failed to get Test Context"),
-        );
-
         info!("Spawning Test Runner");
-
-        let input_rx = self.input_rx.take().ok_or_eyre("No Input RX")?;
-
-        tokio::task::spawn_blocking(move || test_runner.run(input_rx));
 
         while self.state() != AppState::Done {
             self.handle_event().await?;
@@ -124,7 +113,15 @@ impl<T: Send + 'static> App<T> {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
-            // Event::UpdatedTestRunnerState =
+            Event::UserInputPrompt(s) => {
+                let current_index = self.test_data.read().await.current_index;
+                self.test_data.write().await[current_index]
+                    .user_inputs
+                    .push(UserInput {
+                        prompt: s,
+                        input: "".into(),
+                    });
+            }
             _ => (),
         }
 
@@ -142,6 +139,12 @@ impl<T: Send + 'static> App<T> {
             match action.clone() {
                 Action::ExitApp => self.state = AppState::Done,
                 Action::OperatorTextInput(s) => {
+                    let current_index = self.test_data.read().await.current_index;
+                    self.test_data.write().await[current_index]
+                        .user_inputs
+                        .last_mut()
+                        .expect("No Inputs Requested")
+                        .input = s.clone();
                     self.input_tx.send(s)?;
                 }
                 _ => (),
