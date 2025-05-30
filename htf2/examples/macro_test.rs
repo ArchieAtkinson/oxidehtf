@@ -1,33 +1,12 @@
 #[macros::tests]
 mod tests {
     use cli_log::*;
-    use color_eyre::eyre::{eyre, Result};
-    use htf::Input;
+    use color_eyre::eyre::Result;
+    use htf2::TestContext;
 
     #[test]
-    fn test1() -> Result<()> {
-        let value = Input::request("Test 1 Input:");
-        info!("{:?}", value);
-        Ok(())
-    }
-
-    #[test]
-    fn test2() -> Result<()> {
-        let value = Input::request("Test 2 Input:");
-        info!("{:?}", value);
-        Err(eyre!("Err"))
-    }
-
-    #[test]
-    fn test3() -> Result<()> {
-        let value = Input::request("Test 3 Input:");
-        info!("{:?}", value);
-        Ok(())
-    }
-
-    #[test]
-    fn test4() -> Result<()> {
-        let value = Input::request("Test 4 Input:");
+    fn test1(context: &mut TestContext) -> Result<()> {
+        let value = context.text_input.request("Test 1 Input:");
         info!("{:?}", value);
         Ok(())
     }

@@ -13,6 +13,7 @@ tokio = { version = "1.45.0", features = ["full"] }
 tui-input = "0.12.1"
 macros= { path = "../macros" }
 async-trait = "0.1.88"
+indoc = "2.0.6"
 
 [dev-dependencies]
 

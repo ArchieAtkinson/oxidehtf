@@ -33,7 +33,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     let func_name = &func.sig.ident;
                     // Generate the htf::Test::new call for this function
                     test_functions_pointers.push(quote! {
-                        htf::Test::new(#mod_name::#func_name, stringify!(#func_name))
+                        htf2::Test::new(#mod_name::#func_name, stringify!(#func_name))
                     });
                 }
                 processed_items.push(syn::Item::Fn(func)); // Add the modified function
@@ -51,7 +51,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let tests = vec![
                 #(#test_functions_pointers),*
             ];
-            htf::run_tests(tests)
+            htf2::run_tests(tests)
         }
     };
 

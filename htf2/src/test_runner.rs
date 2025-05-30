@@ -39,7 +39,7 @@ impl Test {
             data: TestMetadata {
                 name,
                 state: Default::default(),
-                user_input: Vec::new(),
+                user_inputs: Vec::new(),
             },
         }
     }
@@ -64,16 +64,29 @@ impl UserInput {
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
-    pub user_input: Vec<UserInput>,
+    pub user_inputs: Vec<UserInput>,
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub enum TestRunning {
+    #[default]
+    Running,
+    WaitingForInput,
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub enum TestDone {
+    #[default]
+    Passed,
+    Failed,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub enum TestState {
     #[default]
-    Waiting,
-    Running,
-    Passed,
-    Failed,
+    InQueue,
+    Running(TestRunning),
+    Done(TestDone),
 }
 
 pub struct TestRunner {
@@ -103,7 +116,7 @@ impl TestRunner {
             let test_func = {
                 let mut state_lock = self.state.blocking_write();
                 let test = &mut state_lock.tests[index];
-                test.data.state = TestState::Running;
+                test.data.state = TestState::Running(TestRunning::Running);
                 test.func
             };
 
@@ -112,8 +125,8 @@ impl TestRunner {
             let result = (test_func)(&mut context);
 
             self.state.blocking_write().tests[index].data.state = match result {
-                Ok(_) => TestState::Passed,
-                Err(_) => TestState::Failed,
+                Ok(_) => TestState::Done(TestDone::Passed),
+                Err(_) => TestState::Done(TestDone::Failed),
             };
 
             self.event_tx.send(Event::UpdatedTestRunnerState)?;

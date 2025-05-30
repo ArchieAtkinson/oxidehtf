@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, RwLock};
 
 use crate::events::Event;
 
-use super::TestRunnerState;
+use super::{TestRunnerState, TestState};
 
 pub struct TextInput {
     state: Arc<RwLock<TestRunnerState>>,
@@ -31,8 +31,10 @@ impl TextInput {
             let current_index = lock.current_index;
             lock.tests[current_index]
                 .data
-                .user_input
+                .user_inputs
                 .push(super::UserInput::new(prompt));
+            lock.tests[current_index].data.state =
+                TestState::Running(super::TestRunning::WaitingForInput);
 
             self.event_tx
                 .send(Event::UpdatedTestRunnerState)
@@ -45,10 +47,12 @@ impl TextInput {
         let current_index = lock.current_index;
         lock.tests[current_index]
             .data
-            .user_input
+            .user_inputs
             .last_mut()
             .expect("Should be populated")
             .input = input.clone();
+        lock.tests[current_index].data.state = TestState::Running(super::TestRunning::Running);
+
         input
     }
 }

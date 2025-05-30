@@ -33,7 +33,7 @@ impl UserTextInput {
         let current_index = state.current_index;
         let prompt = state.tests[current_index]
             .data
-            .user_input
+            .user_inputs
             .last()
             .map_or(DEFAULT_PROMPT_TEXT.into(), |i| i.prompt.clone());
 

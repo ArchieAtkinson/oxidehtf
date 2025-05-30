@@ -14,7 +14,7 @@ use crate::events::Event;
 pub struct UiAreas {
     pub test_progress: Rect,
     pub operator: Rect,
-    pub test_list: Rect,
+    pub test_display: Rect,
 }
 
 pub struct Ui {
@@ -64,7 +64,7 @@ impl Ui {
                 let areas = UiAreas {
                     test_progress,
                     operator,
-                    test_list,
+                    test_display: test_list,
                 };
 
                 draw_callback(f, &areas)

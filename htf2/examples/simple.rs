@@ -6,7 +6,9 @@ use htf2::TestContext;
 fn test1(context: &mut TestContext) -> Result<()> {
     info!("Running Test1");
 
-    let input = context.text_input.request("Hello");
+    let input = context.text_input.request("First Prompt");
+
+    let input = context.text_input.request("Second Prompt");
 
     info!("{}", input);
 

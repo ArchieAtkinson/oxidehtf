@@ -3,7 +3,7 @@ use color_eyre::Result;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
-    widgets::{Block, Gauge, List},
+    widgets::{Block, Gauge, List, Paragraph},
     Frame,
 };
 use tokio::sync::mpsc;
@@ -14,6 +14,7 @@ use crate::{
     test_runner::{TestRunnerState, TestState},
     ui::UiAreas,
 };
+use indoc::formatdoc;
 
 use super::Component;
 
@@ -34,8 +35,9 @@ impl TestStatusDisplay {
         let tests_finished = state
             .tests
             .iter()
-            .filter(|test| {
-                test.data.state == TestState::Passed || test.data.state == TestState::Failed
+            .filter(|test| match test.data.state {
+                TestState::Done(_) => true,
+                _ => false,
             })
             .count() as f64;
 
@@ -55,14 +57,38 @@ impl TestStatusDisplay {
         frame.render_widget(bar, area);
     }
 
+    fn render_current_test(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
+        let current_test = state.tests.iter().find(|t| match t.data.state {
+            TestState::Running(_) => true,
+            _ => false,
+        });
+
+        let text = {
+            if let Some(current_test) = current_test {
+                let data = current_test.data.clone();
+                format!("{} - {:?}", data.name, data.state)
+            } else {
+                "No Running Test".into()
+            }
+        };
+
+        let test = Paragraph::new(text).block(
+            Block::bordered()
+                .title("Current Test")
+                .title_style(Style::default().bold()),
+        );
+        frame.render_widget(test, area);
+    }
+
     fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, state: &TestRunnerState) {
         let waiting_tests = state
             .tests
             .iter()
-            .filter(|test| {
-                test.data.state == TestState::Waiting || test.data.state == TestState::Running
+            .filter(|test| match test.data.state {
+                TestState::InQueue | TestState::Running(_) => true,
+                _ => false,
             })
-            .map(|test| format!("{} {:?}", test.data.name, test.data.state));
+            .map(|test| format!("{} - {:?}", test.data.name, test.data.state));
 
         let test_list = List::new(waiting_tests).block(
             Block::bordered()
@@ -77,11 +103,12 @@ impl TestStatusDisplay {
         let completed_tests = state
             .tests
             .iter()
-            .filter(|test| {
-                test.data.state == TestState::Passed || test.data.state == TestState::Failed
+            .filter(|test| match test.data.state {
+                TestState::Done(_) => true,
+                _ => false,
             })
             .rev()
-            .map(|test| format!("{} {:?}", test.data.name, test.data.state));
+            .map(|test| format!("{} - {:?}", test.data.name, test.data.state));
 
         let test_list = List::new(completed_tests).block(
             Block::bordered()
@@ -125,9 +152,14 @@ impl Component for TestStatusDisplay {
 
         self.render_progress(frame, area.test_progress, state);
 
+        let [current_test, list_tests] =
+            Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(area.test_display);
+
+        self.render_current_test(frame, current_test, state);
+
         let [completed_area, waiting_area] =
-            Layout::horizontal([Constraint::Ratio(2, 3), Constraint::Ratio(1, 3)])
-                .areas(area.test_list);
+            Layout::horizontal([Constraint::Ratio(3, 5), Constraint::Ratio(2, 5)])
+                .areas(list_tests);
 
         self.render_completed_tests(frame, completed_area, state);
         self.render_waiting_tests(frame, waiting_area, state);

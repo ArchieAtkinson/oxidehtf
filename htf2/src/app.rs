@@ -116,6 +116,7 @@ impl App {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
+            // Event::UpdatedTestRunnerState =
             _ => (),
         }
 
