@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use cli_log::*;
 // use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
@@ -26,6 +28,12 @@ fn test1(context: &mut TestContext) -> Result<()> {
     info!("Running Test1");
 
     let input = context.text_input.request("First Prompt");
+
+    info!("{}", input);
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let input = context.text_input.request("Second Prompt");
 
     info!("{}", input);
 

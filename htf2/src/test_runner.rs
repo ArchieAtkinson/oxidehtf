@@ -94,6 +94,8 @@ impl<T> TestRunner<T> {
             self.event_tx.send(Event::UpdatedTestData)?;
         }
 
+        self.event_tx.send(Event::TestsCompleted)?;
+
         info!("Done");
 
         Ok(())

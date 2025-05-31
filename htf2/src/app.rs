@@ -10,7 +10,7 @@ use crate::{
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
     events::Event,
     plugs::user_text_input::{UserInput, USER_INPUT_RX},
-    test_runner::TestData,
+    test_runner::{TestData, TestRunning, TestState},
     ui::Ui,
 };
 
@@ -40,7 +40,6 @@ impl App {
         event_tx: mpsc::UnboundedSender<Event>,
     ) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-
         let (input_tx, input_rx) = mpsc::unbounded_channel();
 
         USER_INPUT_RX
@@ -114,13 +113,7 @@ impl App {
                 }
             }
             Event::UserInputPrompt(s) => {
-                let current_index = self.test_data.read().await.current_index;
-                self.test_data.write().await[current_index]
-                    .user_inputs
-                    .push(UserInput {
-                        prompt: s,
-                        input: "".into(),
-                    });
+                self.action_tx.send(Action::UserInputPrompt(s))?;
             }
             _ => (),
         }
@@ -138,13 +131,25 @@ impl App {
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 Action::ExitApp => self.state = AppState::Done,
-                Action::OperatorTextInput(s) => {
+                Action::UserInputPrompt(s) => {
                     let current_index = self.test_data.read().await.current_index;
                     self.test_data.write().await[current_index]
                         .user_inputs
+                        .push(UserInput {
+                            prompt: s,
+                            input: "".into(),
+                        });
+                    self.test_data.write().await[current_index].state =
+                        TestState::Running(TestRunning::WaitingForInput);
+                }
+                Action::UserInputValue(s) => {
+                    let current_index = self.test_data.read().await.current_index;
+                    let lock = &mut self.test_data.write().await[current_index];
+                    lock.user_inputs
                         .last_mut()
                         .expect("No Inputs Requested")
                         .input = s.clone();
+                    lock.state = TestState::Running(TestRunning::Running);
                     self.input_tx.send(s)?;
                 }
                 _ => (),

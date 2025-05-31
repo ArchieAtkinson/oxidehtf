@@ -1,4 +1,4 @@
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{OptionExt, Result};
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -8,11 +8,14 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, events::Event, test_runner::TestData, ui::UiAreas};
+use crate::{
+    actions::Action,
+    events::Event,
+    test_runner::{TestData, TestRunning, TestState},
+    ui::UiAreas,
+};
 
 use super::Component;
-
-const DEFAULT_PROMPT_TEXT: &'static str = "No Input Currently Required";
 
 pub struct UserTextInput {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
@@ -29,13 +32,22 @@ impl UserTextInput {
         }
     }
 
-    fn draw_input(&mut self, frame: &mut Frame, area: Rect, data: &TestData) -> Result<()> {
+    fn set_prompt(&self, data: &TestData) -> Result<String> {
         let current_index = data.current_index;
-        let prompt = data[current_index]
-            .user_inputs
-            .last()
-            .map_or(DEFAULT_PROMPT_TEXT.into(), |i| i.prompt.clone());
+        let current_test = data[current_index].clone();
+        match current_test.state {
+            TestState::Running(TestRunning::WaitingForInput) => Ok(current_test
+                .user_inputs
+                .last()
+                .ok_or_eyre("Failed to get latest user_input")?
+                .prompt
+                .clone()),
+            _ => Ok("No Input Currently Required".into()),
+        }
+    }
 
+    fn draw_input(&mut self, frame: &mut Frame, area: Rect, data: &TestData) -> Result<()> {
+        let prompt = self.set_prompt(data)?;
         // keep 2 for borders and 1 for cursor
         let width = area.width.max(3) - 3;
         let scroll = self.txt_input.visual_scroll(width as usize);
@@ -83,7 +95,7 @@ impl Component for UserTextInput {
                 let _ = self.txt_input.handle_event(&e);
             }
             Action::SendInput => {
-                return Ok(Some(Action::OperatorTextInput(
+                return Ok(Some(Action::UserInputValue(
                     self.txt_input.value_and_reset(),
                 )));
             }

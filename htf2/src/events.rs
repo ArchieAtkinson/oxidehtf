@@ -3,4 +3,5 @@ pub enum Event {
     CrosstermEvent(crossterm::event::Event),
     UpdatedTestData,
     UserInputPrompt(String),
+    TestsCompleted,
 }
