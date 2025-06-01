@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
-    events::Event,
+    events::{Event, PlugEvent},
     plugs::user_text_input::{UserInput, USER_INPUT_RX},
     test_runner::{TestData, TestRunning, TestState},
     ui::Ui,
@@ -112,9 +112,11 @@ impl App {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
-            Event::UserInputPrompt(s) => {
-                self.action_tx.send(Action::UserInputPrompt(s))?;
-            }
+            Event::PlugEvent(e) => match e {
+                PlugEvent::UserInputPrompt(s) => {
+                    self.action_tx.send(Action::UserInputPrompt(s))?;
+                }
+            },
             _ => (),
         }
 

@@ -1,16 +1,13 @@
 use std::sync::OnceLock;
 
-use tokio::sync::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    Mutex,
-};
+use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-use crate::events::Event;
+use crate::PlugEvent;
 
-use super::Plug;
+use super::{Plug, PlugEventSender};
 
 pub struct TextInput {
-    event_tx: Option<UnboundedSender<Event>>,
+    sender: Option<PlugEventSender>,
 }
 
 pub static USER_INPUT_RX: OnceLock<Mutex<UnboundedReceiver<String>>> = OnceLock::new();
@@ -32,14 +29,14 @@ impl UserInput {
 
 impl TextInput {
     pub fn new() -> Self {
-        Self { event_tx: None }
+        Self { sender: None }
     }
 
     pub fn request(&mut self, prompt: impl Into<String>) -> String {
-        self.event_tx
+        self.sender
             .as_ref()
             .expect("Event Tx Not Provided")
-            .send(Event::UserInputPrompt(prompt.into()))
+            .send(PlugEvent::UserInputPrompt(prompt.into()))
             .expect("Failed to send");
 
         USER_INPUT_RX.wait();
@@ -54,7 +51,13 @@ impl TextInput {
 }
 
 impl Plug for TextInput {
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) {
-        self.event_tx = Some(tx);
+    fn request_sender(&mut self, sender: PlugEventSender) {
+        self.sender = Some(sender);
+    }
+}
+
+impl Default for TextInput {
+    fn default() -> Self {
+        Self { sender: None }
     }
 }

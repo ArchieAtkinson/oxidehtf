@@ -3,21 +3,22 @@ pub(crate) mod app;
 pub(crate) mod components;
 pub(crate) mod errors;
 pub(crate) mod events;
+pub(crate) mod measurement;
 pub(crate) mod plugs;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
 pub use errors::TestFailure;
-pub use events::Event;
+pub use events::PlugEvent;
+pub use measurement::*;
 pub use plugs::user_text_input::TextInput;
 pub use plugs::Plug;
-
-use std::sync::Arc;
-
-use test_runner::{FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState};
+pub use plugs::PlugEventSender;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
+use std::sync::Arc;
+use test_runner::{FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState};
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, RwLock},
@@ -90,7 +91,7 @@ pub fn run_tests<T: Send + 'static + Plug>(
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let test_data = Arc::new(RwLock::new(data));
 
-        context.register_event_handler(event_tx.clone());
+        context.request_sender(PlugEventSender::new(event_tx.clone()));
 
         let mut test_runner = TestRunner::new(funcs, test_data.clone(), event_tx.clone(), context);
 

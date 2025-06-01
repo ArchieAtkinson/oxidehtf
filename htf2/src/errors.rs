@@ -7,4 +7,5 @@ pub enum TestFailure {
         line: u32,
     },
     TextInputError(String),
+    MeasurementError,
 }

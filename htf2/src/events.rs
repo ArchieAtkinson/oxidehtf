@@ -2,6 +2,11 @@
 pub enum Event {
     CrosstermEvent(crossterm::event::Event),
     UpdatedTestData,
-    UserInputPrompt(String),
     TestsCompleted,
+    PlugEvent(PlugEvent),
+}
+
+#[derive(Debug, Clone)]
+pub enum PlugEvent {
+    UserInputPrompt(String),
 }
