@@ -64,7 +64,7 @@ impl TestStatusDisplay {
         let text = {
             if let Some(current_test) = current_test {
                 let data = current_test.clone();
-                format!("{} - {:?}", data.name, data.state)
+                format!("{}", data)
             } else {
                 "No Running Test".into()
             }
@@ -85,7 +85,7 @@ impl TestStatusDisplay {
                 TestState::InQueue | TestState::Running(_) => true,
                 _ => false,
             })
-            .map(|test| format!("{} - {:?}", test.name, test.state));
+            .map(|test| format!("{} - {}", test.name, test.state));
 
         let test_list = List::new(waiting_tests).block(
             Block::bordered()
@@ -104,7 +104,7 @@ impl TestStatusDisplay {
                 _ => false,
             })
             .rev()
-            .map(|test| format!("{} - {:?}", test.name, test.state));
+            .map(|test| format!("{}\n", test));
 
         let test_list = List::new(completed_tests).block(
             Block::bordered()
@@ -149,7 +149,7 @@ impl Component for TestStatusDisplay {
         self.render_progress(frame, area.test_progress, data);
 
         let [current_test, list_tests] =
-            Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(area.test_display);
+            Layout::vertical([Constraint::Length(10), Constraint::Min(1)]).areas(area.test_display);
 
         self.render_current_test(frame, current_test, data);
 

@@ -1,11 +1,13 @@
 pub(crate) mod actions;
 pub(crate) mod app;
 pub(crate) mod components;
+pub(crate) mod errors;
 pub(crate) mod events;
 pub(crate) mod plugs;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
+pub use errors::TestFailure;
 pub use events::Event;
 pub use plugs::user_text_input::TextInput;
 pub use plugs::Plug;
@@ -52,6 +54,27 @@ macro_rules! register_tests {
     };
 }
 
+#[macro_export]
+macro_rules! assert_eq {
+    ($left:expr, $right:expr, $($arg:tt)*) => {{
+        match (&$left, &$right) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    return Err(htf2::TestFailure::AssertionFailed {
+                        expected: format!("{:?}", right_val),
+                        found: format!("{:?}", left_val),
+                        file: file!(),
+                        line: line!(),
+                    });
+                }
+            }
+        }
+    }};
+    ($left:expr, $right:expr) => {{
+        htf2::assert_eq!($left, $right, "");
+    }};
+}
+
 pub fn run_tests<T: Send + 'static + Plug>(
     funcs: TestFunctions<T>,
     data: TestData,
@@ -67,7 +90,7 @@ pub fn run_tests<T: Send + 'static + Plug>(
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let test_data = Arc::new(RwLock::new(data));
 
-        context.register_event_handler(event_tx.clone())?;
+        context.register_event_handler(event_tx.clone());
 
         let mut test_runner = TestRunner::new(funcs, test_data.clone(), event_tx.clone(), context);
 

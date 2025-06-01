@@ -1,6 +1,5 @@
 use std::sync::OnceLock;
 
-use color_eyre::Result;
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     Mutex,
@@ -55,8 +54,7 @@ impl TextInput {
 }
 
 impl Plug for TextInput {
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) {
         self.event_tx = Some(tx);
-        Ok(())
     }
 }

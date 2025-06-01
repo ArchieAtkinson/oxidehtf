@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use cli_log::*;
-// use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
 use htf2::{Event, Plug, TextInput};
 use tokio::sync::mpsc::UnboundedSender;
@@ -11,7 +10,7 @@ pub struct TestContext {
 }
 
 impl Plug for TestContext {
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) {
         self.text_input.register_event_handler(tx)
     }
 }
@@ -24,12 +23,14 @@ impl TestContext {
     }
 }
 
-fn test1(context: &mut TestContext) -> Result<()> {
+fn test1(context: &mut TestContext) -> Result<(), htf2::TestFailure> {
     info!("Running Test1");
 
-    let input = context.text_input.request("First Prompt");
+    let input = context.text_input.request("The answer is 'Test'");
 
     info!("{}", input);
+
+    htf2::assert_eq!(input, "Test");
 
     std::thread::sleep(Duration::from_secs(1));
 
@@ -40,8 +41,20 @@ fn test1(context: &mut TestContext) -> Result<()> {
     Ok(())
 }
 
+fn test2_with_longer_name(context: &mut TestContext) -> Result<(), htf2::TestFailure> {
+    info!("Running Test12");
+
+    let input = context.text_input.request("The answer is 'Hello'");
+
+    info!("{}", input);
+
+    htf2::assert_eq!(input, "Hello");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
-    let (funcs, data) = htf2::register_tests!(test1);
+    let (funcs, data) = htf2::register_tests!(test1, test2_with_longer_name);
     let context = TestContext::new();
     htf2::run_tests(funcs, data, context)
 }

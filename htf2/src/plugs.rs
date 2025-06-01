@@ -10,8 +10,7 @@ pub trait Plug {
         Ok(())
     }
 
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) {
         let _ = tx;
-        Ok(())
     }
 }
