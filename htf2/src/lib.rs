@@ -1,22 +1,23 @@
 pub(crate) mod actions;
 pub(crate) mod app;
 pub(crate) mod components;
+pub(crate) mod context;
 pub(crate) mod errors;
 pub(crate) mod events;
+pub(crate) mod lifecycle;
 pub(crate) mod measurement;
-pub(crate) mod plugs;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
+pub use context::SysContext;
 pub use errors::TestFailure;
-pub use events::PlugEvent;
-pub use measurement::*;
-pub use plugs::user_text_input::TextInput;
-pub use plugs::Plug;
-pub use plugs::PlugEventSender;
+pub use lifecycle::TestLifecycle;
+pub use measurement::Unit;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
+use context::user_text_input::TextInput;
+use measurement::Measurements;
 use std::sync::Arc;
 use test_runner::{FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState};
 use tokio::{
@@ -76,10 +77,10 @@ macro_rules! assert_eq {
     }};
 }
 
-pub fn run_tests<T: Send + 'static + Plug>(
+pub fn run_tests<T: Send + 'static + TestLifecycle>(
     funcs: TestFunctions<T>,
     data: TestData,
-    mut context: T,
+    fixture: T,
 ) -> Result<()> {
     init_cli_log!();
 
@@ -89,15 +90,21 @@ pub fn run_tests<T: Send + 'static + Plug>(
 
     rt.block_on(async move {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let (input_tx, input_rx) = mpsc::unbounded_channel();
+
         let test_data = Arc::new(RwLock::new(data));
 
-        context.request_sender(PlugEventSender::new(event_tx.clone()));
+        let context = SysContext {
+            text_input: TextInput::new(event_tx.clone(), input_rx),
+            measurements: Measurements::new(),
+        };
 
-        let mut test_runner = TestRunner::new(funcs, test_data.clone(), event_tx.clone(), context);
+        let mut test_runner =
+            TestRunner::new(funcs, test_data.clone(), event_tx.clone(), context, fixture);
 
         tokio::task::spawn_blocking(move || test_runner.run());
 
-        let mut app = app::App::new(test_data.clone(), event_rx, event_tx)?;
+        let mut app = app::App::new(test_data.clone(), event_rx, event_tx, input_tx)?;
         app.run().await
     })?;
 

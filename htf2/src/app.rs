@@ -3,13 +3,13 @@ use std::sync::Arc;
 use cli_log::*;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, RwLock};
 
 use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
-    events::{Event, PlugEvent},
-    plugs::user_text_input::{UserInput, USER_INPUT_RX},
+    context::user_text_input::UserInput,
+    events::Event,
     test_runner::{TestData, TestRunning, TestState},
     ui::Ui,
 };
@@ -38,13 +38,9 @@ impl App {
         data: Arc<RwLock<TestData>>,
         event_rx: mpsc::UnboundedReceiver<Event>,
         event_tx: mpsc::UnboundedSender<Event>,
+        input_tx: mpsc::UnboundedSender<String>,
     ) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let (input_tx, input_rx) = mpsc::unbounded_channel();
-
-        USER_INPUT_RX
-            .set(Mutex::new(input_rx))
-            .expect("Failed to set User Input Rx");
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
@@ -112,11 +108,9 @@ impl App {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
-            Event::PlugEvent(e) => match e {
-                PlugEvent::UserInputPrompt(s) => {
-                    self.action_tx.send(Action::UserInputPrompt(s))?;
-                }
-            },
+            Event::UserInputPrompt(s) => {
+                self.action_tx.send(Action::UserInputPrompt(s))?;
+            }
             _ => (),
         }
 

@@ -7,9 +7,11 @@ use cli_log::*;
 use color_eyre::Result;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::{events::Event, plugs::user_text_input::UserInput, TestFailure};
+use crate::{
+    context::user_text_input::UserInput, events::Event, SysContext, TestFailure, TestLifecycle,
+};
 
-pub type FuncType<T> = fn(&mut T) -> Result<(), TestFailure>;
+pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
 #[derive(Debug, Clone)]
 pub struct TestData {
@@ -51,25 +53,28 @@ pub enum TestDone {
     Failed,
 }
 
-pub struct TestRunner<T> {
+pub struct TestRunner<T: TestLifecycle> {
     data: Arc<RwLock<TestData>>,
     funcs: TestFunctions<T>,
     event_tx: mpsc::UnboundedSender<Event>,
-    context: T,
+    context: SysContext,
+    fixture: T,
 }
 
-impl<T> TestRunner<T> {
+impl<T: TestLifecycle> TestRunner<T> {
     pub fn new(
         funcs: TestFunctions<T>,
         data: Arc<RwLock<TestData>>,
         event_tx: mpsc::UnboundedSender<Event>,
-        context: T,
+        context: SysContext,
+        fixture: T,
     ) -> Self {
         Self {
             data,
             funcs,
             event_tx,
             context,
+            fixture,
         }
     }
 
@@ -78,6 +83,8 @@ impl<T> TestRunner<T> {
         let num_tests = self.data.blocking_read().data.len();
 
         info!("Loop");
+
+        self.fixture.setup()?;
 
         for index in 0..num_tests {
             {
@@ -88,7 +95,9 @@ impl<T> TestRunner<T> {
 
             self.event_tx.send(Event::UpdatedTestData)?;
 
-            let result = (self.funcs.funcs[index])(&mut self.context);
+            self.fixture.before_test()?;
+            let result = (self.funcs.funcs[index])(&mut self.context, &mut self.fixture);
+            self.fixture.after_test()?;
 
             self.data.blocking_write()[index].state = match result {
                 Ok(_) => TestState::Done(TestDone::Passed),
@@ -102,6 +111,8 @@ impl<T> TestRunner<T> {
         }
 
         self.event_tx.send(Event::TestsCompleted)?;
+
+        self.fixture.teardown()?;
 
         info!("Done");
 

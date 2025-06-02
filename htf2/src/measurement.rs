@@ -9,7 +9,7 @@ pub enum Unit {
 
 #[derive(Debug, Clone)]
 pub struct MeasurementDefinition {
-    pub name: String,
+    pub _name: String,
     pub unit: Option<Unit>,
     pub range: Option<(f64, f64)>,
 }
@@ -31,7 +31,7 @@ impl Measurements {
         self.definitions
             .entry(name.to_string())
             .or_insert_with(|| MeasurementDefinition {
-                name: name.to_string(),
+                _name: name.to_string(),
                 unit: None,
                 range: None,
             });
