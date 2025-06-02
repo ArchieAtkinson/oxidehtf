@@ -5,6 +5,7 @@ use std::{
 
 use cli_log::*;
 use color_eyre::Result;
+use indexmap::IndexMap;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::{
@@ -19,11 +20,17 @@ pub struct TestData {
     pub current_index: usize,
 }
 
+impl TestData {
+    pub fn current_test(&mut self) -> &mut TestMetadata {
+        &mut self.data[self.current_index]
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
-    pub user_inputs: Vec<UserInput>,
+    pub user_inputs: IndexMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,11 +94,10 @@ impl<T: TestLifecycle> TestRunner<T> {
         self.fixture.setup()?;
 
         for index in 0..num_tests {
-            {
-                let lock = &mut self.data.blocking_write();
-                lock.data[index].state = TestState::Running(TestRunning::Running);
-                lock.current_index = index;
-            }
+            let mut data_guard = self.data.blocking_write();
+            data_guard.current_index = index;
+            data_guard.current_test().state = TestState::Running(TestRunning::Running);
+            drop(data_guard);
 
             self.event_tx.send(Event::UpdatedTestData)?;
 
@@ -140,9 +146,9 @@ impl std::fmt::Display for TestMetadata {
         if !self.user_inputs.is_empty() {
             write!(f, "     Operator Input(s)")?;
             for input in self.user_inputs.clone() {
-                write!(f, "\n        Prompt: {}", input.prompt)?;
-                if !input.input.is_empty() {
-                    write!(f, "\n        Input: {}\n", input.input)?;
+                write!(f, "\n        Prompt: {}", input.0)?;
+                if !input.1.is_empty() {
+                    write!(f, "\n        Input: {}\n", input.1)?;
                 }
             }
         }

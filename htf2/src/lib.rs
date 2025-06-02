@@ -11,6 +11,7 @@ pub(crate) mod ui;
 
 pub use context::SysContext;
 pub use errors::TestFailure;
+use indexmap::IndexMap;
 pub use lifecycle::TestLifecycle;
 pub use measurement::Unit;
 
@@ -37,7 +38,7 @@ pub fn gen_test_data<T>(
             .map(|n| TestMetadata {
                 name: *n,
                 state: TestState::InQueue,
-                user_inputs: Vec::new(),
+                user_inputs: IndexMap::new(),
             })
             .collect(),
         current_index: 0,
@@ -95,7 +96,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
         let test_data = Arc::new(RwLock::new(data));
 
         let context = SysContext {
-            text_input: TextInput::new(event_tx.clone(), input_rx),
+            text_input: TextInput::new(event_tx.clone(), input_rx, test_data.clone()),
             measurements: Measurements::new(),
         };
 

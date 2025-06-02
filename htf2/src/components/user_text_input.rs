@@ -40,7 +40,7 @@ impl UserTextInput {
                 .user_inputs
                 .last()
                 .ok_or_eyre("Failed to get latest user_input")?
-                .prompt
+                .0
                 .clone()),
             _ => Ok("No Input Currently Required".into()),
         }

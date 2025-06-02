@@ -8,9 +8,8 @@ use tokio::sync::{mpsc, RwLock};
 use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
-    context::user_text_input::UserInput,
     events::Event,
-    test_runner::{TestData, TestRunning, TestState},
+    test_runner::TestData,
     ui::Ui,
 };
 
@@ -108,9 +107,6 @@ impl App {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
-            Event::UserInputPrompt(s) => {
-                self.action_tx.send(Action::UserInputPrompt(s))?;
-            }
             _ => (),
         }
 
@@ -127,25 +123,7 @@ impl App {
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 Action::ExitApp => self.state = AppState::Done,
-                Action::UserInputPrompt(s) => {
-                    let current_index = self.test_data.read().await.current_index;
-                    self.test_data.write().await[current_index]
-                        .user_inputs
-                        .push(UserInput {
-                            prompt: s,
-                            input: "".into(),
-                        });
-                    self.test_data.write().await[current_index].state =
-                        TestState::Running(TestRunning::WaitingForInput);
-                }
                 Action::UserInputValue(s) => {
-                    let current_index = self.test_data.read().await.current_index;
-                    let lock = &mut self.test_data.write().await[current_index];
-                    lock.user_inputs
-                        .last_mut()
-                        .expect("No Inputs Requested")
-                        .input = s.clone();
-                    lock.state = TestState::Running(TestRunning::Running);
                     self.input_tx.send(s)?;
                 }
                 _ => (),

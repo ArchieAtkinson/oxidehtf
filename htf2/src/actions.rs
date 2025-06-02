@@ -4,5 +4,4 @@ pub enum Action {
     SendInput,
     ExitApp,
     UserInputValue(String),
-    UserInputPrompt(String),
 }
