@@ -3,7 +3,6 @@
 
 TODO:
 - Improve TUI display
-    - Wrap upcoming tests
 - Improve Measurement System
 - Extend TestFailures and display them
 - Add scrolling to Completed and Upcoming test panes

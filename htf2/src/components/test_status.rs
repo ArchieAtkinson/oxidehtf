@@ -3,7 +3,8 @@ use color_eyre::Result;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
-    widgets::{Block, Gauge, List, Paragraph},
+    text::{Line, Text},
+    widgets::{Block, Gauge, List, Paragraph, Wrap},
     Frame,
 };
 use tokio::sync::mpsc;
@@ -79,19 +80,22 @@ impl TestStatusDisplay {
     }
 
     fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
-        let waiting_tests = data
+        let waiting_tests: Vec<Line> = data
             .iter()
             .filter(|test| match test.state {
                 TestState::InQueue | TestState::Running(_) => true,
                 _ => false,
             })
-            .map(|test| format!("{} - {}", test.name, test.state));
+            .map(|test| Line::from(format!("{} - {}", test.name, test.state)))
+            .collect();
 
-        let test_list = List::new(waiting_tests).block(
-            Block::bordered()
-                .title("Upcoming Tests")
-                .title_style(Style::default().bold()),
-        );
+        let test_list = Paragraph::new(Text::from(waiting_tests))
+            .block(
+                Block::bordered()
+                    .title("Upcoming Tests")
+                    .title_style(Style::default().bold()),
+            )
+            .wrap(Wrap { trim: true });
 
         frame.render_widget(test_list, area);
     }

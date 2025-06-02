@@ -28,4 +28,8 @@ pub trait Plug: Default {
     fn request_sender(&mut self, sender: PlugEventSender) {
         let _ = sender;
     }
+
+    fn teardown(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
