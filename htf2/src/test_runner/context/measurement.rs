@@ -14,10 +14,16 @@ pub enum Unit {
 }
 
 #[derive(Debug, Clone)]
+pub enum DataTypes {
+    F64(f64),
+    String(String),
+}
+
+#[derive(Debug, Clone)]
 pub struct MeasurementDefinition {
     pub unit: Option<Unit>,
     pub range: Option<(f64, f64)>,
-    pub value: Option<f64>,
+    pub value: Option<DataTypes>,
 }
 
 pub struct Measurements {
@@ -52,12 +58,12 @@ impl Measurements {
         }
     }
 
-    pub fn set_value(&mut self, name: &str, value: f64) -> Result<(), TestFailure> {
+    fn set_value_internal(&mut self, name: &str, value: DataTypes) -> Result<(), TestFailure> {
         let Some(mut def) = self.definitions.remove(name) else {
             return Err(TestFailure::MeasurementError);
         };
 
-        def.value = Some(value);
+        def.value = Some(value.clone());
 
         self.test_state
             .blocking_write()
@@ -68,9 +74,11 @@ impl Measurements {
             return Err(TestFailure::MeasurementError);
         }
 
-        if let Some((min, max)) = def.range {
-            if value < min || value > max {
-                return Err(TestFailure::MeasurementError);
+        if let DataTypes::F64(value) = value {
+            if let Some((min, max)) = def.range {
+                if value < min || value > max {
+                    return Err(TestFailure::MeasurementError);
+                }
             }
         }
 
@@ -108,9 +116,26 @@ impl<'a> MeasurementSetter<'a> {
         self
     }
 
-    pub fn set(self, value: f64) -> Result<(), TestFailure> {
+    fn set_internal(self, value: DataTypes) -> Result<(), TestFailure> {
         self.manager
             .update_definition(&self.name, self.unit, self.range);
-        self.manager.set_value(&self.name, value)
+        self.manager.set_value_internal(&self.name, value)
+    }
+
+    pub fn set(self, value: f64) -> Result<(), TestFailure> {
+        self.set_internal(DataTypes::F64(value))
+    }
+
+    pub fn set_str(self, value: &str) -> Result<(), TestFailure> {
+        self.set_internal(DataTypes::String(value.into()))
+    }
+}
+
+impl std::fmt::Display for DataTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::F64(v) => write!(f, "{}", v),
+            Self::String(v) => write!(f, "{}", v),
+        }
     }
 }

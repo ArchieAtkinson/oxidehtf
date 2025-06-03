@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use cli_log::*;
-use color_eyre::eyre::Result;
+use color_eyre::{eyre::Result, owo_colors::OwoColorize};
 use htf2::{SysContext, TestLifecycle, Unit};
 
 #[derive(Default)]
@@ -26,6 +26,11 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
         .with_unit(Unit::Volts)
         .in_range(0.0, 10.0)
         .set(1.0)?;
+
+    context
+        .measurements
+        .measure("String Measurement")
+        .set_str("Test Value")?;
 
     let input = context.text_input.request("Second Prompt");
 

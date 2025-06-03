@@ -171,7 +171,12 @@ impl std::fmt::Display for TestMetadata {
                 UserDataType::Measurement(m) => {
                     write!(f, "\n     Measurement")?;
                     write!(f, "\n        Name: {}", key)?;
-                    write!(f, "\n        Input: {:?}\n", m.value)?;
+
+                    if let Some(value) = &m.value {
+                        write!(f, "\n        Input: {}\n", value)?;
+                    } else {
+                        write!(f, "\n        Input: <Waiting For Input>\n")?;
+                    }
                 }
             }
         }
