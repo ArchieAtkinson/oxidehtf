@@ -50,7 +50,10 @@ impl TestStatusDisplay {
         let progress_percentage = (progress_ratio * 100.0) as i32;
         let bar = Gauge::default()
             .gauge_style(Style::new().black().on_white().bold())
-            .label(format!("Test Suite Progress: {}%", progress_percentage))
+            .label(format!(
+                "Test Suite Progress: {}% ({}/{})",
+                progress_percentage, tests_finished as i32, total_tests as i32
+            ))
             .ratio(progress_ratio);
 
         frame.render_widget(bar, area);
