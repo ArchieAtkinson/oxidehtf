@@ -1,30 +1,26 @@
 pub(crate) mod actions;
 pub(crate) mod app;
 pub(crate) mod components;
-pub(crate) mod context;
-pub(crate) mod errors;
 pub(crate) mod events;
-pub(crate) mod lifecycle;
-pub(crate) mod measurement;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
-pub use context::SysContext;
-pub use errors::TestFailure;
-use indexmap::IndexMap;
-pub use lifecycle::TestLifecycle;
-pub use measurement::Unit;
-
 use cli_log::*;
 use color_eyre::eyre::Result;
-use context::user_text_input::TextInput;
-use measurement::Measurements;
+use indexmap::IndexMap;
 use std::sync::Arc;
-use test_runner::{FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState};
+use test_runner::{
+    context::{measurement::Measurements, user_text_input::TextInput},
+    FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState,
+};
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, RwLock},
 };
+
+pub use test_runner::context::{measurement::Unit, SysContext};
+pub use test_runner::errors::TestFailure;
+pub use test_runner::lifecycle::TestLifecycle;
 
 pub fn gen_test_data<T>(
     funcs: Vec<FuncType<T>>,
@@ -39,6 +35,7 @@ pub fn gen_test_data<T>(
                 name: *n,
                 state: TestState::InQueue,
                 user_inputs: IndexMap::new(),
+                measurements: IndexMap::new(),
             })
             .collect(),
         current_index: 0,
@@ -97,7 +94,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
 
         let context = SysContext {
             text_input: TextInput::new(event_tx.clone(), input_rx, test_data.clone()),
-            measurements: Measurements::new(),
+            measurements: Measurements::new(test_data.clone(), event_tx.clone()),
         };
 
         let mut test_runner =
@@ -106,6 +103,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
         tokio::task::spawn_blocking(move || test_runner.run());
 
         let mut app = app::App::new(test_data.clone(), event_rx, event_tx, input_tx)?;
+
         app.run().await
     })?;
 

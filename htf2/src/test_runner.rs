@@ -5,12 +5,17 @@ use std::{
 
 use cli_log::*;
 use color_eyre::Result;
+use context::{measurement::MeasurementDefinition, SysContext};
+use errors::TestFailure;
 use indexmap::IndexMap;
+use lifecycle::TestLifecycle;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::{
-    context::user_text_input::UserInput, events::Event, SysContext, TestFailure, TestLifecycle,
-};
+use crate::events::Event;
+
+pub mod context;
+pub mod errors;
+pub mod lifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
@@ -31,6 +36,7 @@ pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
     pub user_inputs: IndexMap<String, String>,
+    pub measurements: IndexMap<String, MeasurementDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -142,27 +148,27 @@ impl DerefMut for TestData {
 
 impl std::fmt::Display for TestMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} - {}\n", self.name, self.state)?;
+        write!(f, "{} - {}", self.name, self.state)?;
         if !self.user_inputs.is_empty() {
-            write!(f, "     Operator Input(s)")?;
+            write!(f, "\n     Operator Input(s)")?;
             for input in self.user_inputs.clone() {
                 write!(f, "\n        Prompt: {}", input.0)?;
                 if !input.1.is_empty() {
                     write!(f, "\n        Input: {}\n", input.1)?;
+                } else {
+                    write!(f, "\n        Input: <Waiting For Input>\n")?;
                 }
             }
         }
-        Ok(())
-    }
-}
 
-impl std::fmt::Display for UserInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.input.is_empty() {
-            return write!(f, "Prompt: {}", self.prompt);
-        } else {
-            return write!(f, "Prompt: {}\nInput: {}", self.prompt, self.input);
+        if !self.measurements.is_empty() {
+            write!(f, "\n     Measurements")?;
+            for measurement in self.measurements.clone() {
+                write!(f, "\n        Name: {}", measurement.0)?;
+                write!(f, "\n        Input: {:?}\n", measurement.1.value)?;
+            }
         }
+        Ok(())
     }
 }
 

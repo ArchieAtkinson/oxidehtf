@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::TestFailure;
+use tokio::sync::{mpsc::UnboundedSender, RwLock};
+
+use crate::{events::Event, test_runner::TestData, TestFailure};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -9,21 +11,23 @@ pub enum Unit {
 
 #[derive(Debug, Clone)]
 pub struct MeasurementDefinition {
-    pub name: String,
     pub unit: Option<Unit>,
     pub range: Option<(f64, f64)>,
+    pub value: Option<f64>,
 }
 
 pub struct Measurements {
     definitions: HashMap<String, MeasurementDefinition>,
-    values: HashMap<String, f64>,
+    test_state: Arc<RwLock<TestData>>,
+    event_tx: UnboundedSender<Event>,
 }
 
 impl Measurements {
-    pub fn new() -> Self {
+    pub fn new(test_state: Arc<RwLock<TestData>>, event_tx: UnboundedSender<Event>) -> Self {
         Measurements {
             definitions: HashMap::new(),
-            values: HashMap::new(),
+            test_state,
+            event_tx,
         }
     }
 
@@ -31,30 +35,41 @@ impl Measurements {
         self.definitions
             .entry(name.to_string())
             .or_insert_with(|| MeasurementDefinition {
-                name: name.to_string(),
                 unit: None,
                 range: None,
+                value: None,
             });
 
         MeasurementSetter {
             manager: self,
             name: name.to_string(),
-            temp_unit: None,
-            temp_range: None,
+            unit: None,
+            range: None,
         }
     }
 
     pub fn set_value(&mut self, name: &str, value: f64) -> Result<(), TestFailure> {
-        if let Some(def) = self.definitions.get(name) {
-            if let Some((min, max)) = def.range {
-                if value < min || value > max {
-                    return Err(TestFailure::MeasurementError);
-                }
-            }
-            self.values.insert(name.to_string(), value);
-        } else {
+        let Some(mut def) = self.definitions.remove(name) else {
+            return Err(TestFailure::MeasurementError);
+        };
+
+        def.value = Some(value);
+
+        self.test_state
+            .blocking_write()
+            .current_test()
+            .measurements
+            .insert(name.into(), def.clone());
+        if self.event_tx.send(Event::UpdatedTestData).is_err() {
             return Err(TestFailure::MeasurementError);
         }
+
+        if let Some((min, max)) = def.range {
+            if value < min || value > max {
+                return Err(TestFailure::MeasurementError);
+            }
+        }
+
         Ok(())
     }
 
@@ -74,33 +89,24 @@ impl Measurements {
 pub struct MeasurementSetter<'a> {
     manager: &'a mut Measurements,
     name: String,
-    temp_unit: Option<Unit>,
-    temp_range: Option<(f64, f64)>,
+    unit: Option<Unit>,
+    range: Option<(f64, f64)>,
 }
 
 impl<'a> MeasurementSetter<'a> {
     pub fn with_unit(mut self, unit: Unit) -> Self {
-        self.temp_unit = Some(unit);
+        self.unit = Some(unit);
         self
     }
 
     pub fn in_range(mut self, min: f64, max: f64) -> Self {
-        self.temp_range = Some((min, max));
+        self.range = Some((min, max));
         self
     }
 
     pub fn set(self, value: f64) -> Result<(), TestFailure> {
         self.manager
-            .update_definition(&self.name, self.temp_unit, self.temp_range);
+            .update_definition(&self.name, self.unit, self.range);
         self.manager.set_value(&self.name, value)
-    }
-}
-
-impl Default for Measurements {
-    fn default() -> Self {
-        Self {
-            definitions: Default::default(),
-            values: Default::default(),
-        }
     }
 }

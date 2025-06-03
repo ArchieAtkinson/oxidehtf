@@ -20,16 +20,18 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
 
     std::thread::sleep(Duration::from_secs(1));
 
-    let input = context.text_input.request("Second Prompt");
-
-    info!("{}", input);
-
     context
         .measurements
         .measure("Test")
         .with_unit(Unit::Volts)
         .in_range(0.0, 10.0)
-        .set(11.0)?;
+        .set(1.0)?;
+
+    let input = context.text_input.request("Second Prompt");
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    info!("{}", input);
 
     Ok(())
 }

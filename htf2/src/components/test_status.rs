@@ -108,7 +108,7 @@ impl TestStatusDisplay {
                 _ => false,
             })
             .rev()
-            .map(|test| format!("{}\n", test));
+            .map(|test| Line::from(format!("{} - {}", test.name, test.state)));
 
         let test_list = List::new(completed_tests).block(
             Block::bordered()
@@ -153,7 +153,7 @@ impl Component for TestStatusDisplay {
         self.render_progress(frame, area.test_progress, data);
 
         let [current_test, list_tests] =
-            Layout::vertical([Constraint::Length(10), Constraint::Min(1)]).areas(area.test_display);
+            Layout::vertical([Constraint::Length(20), Constraint::Min(1)]).areas(area.test_display);
 
         self.render_current_test(frame, current_test, data);
 

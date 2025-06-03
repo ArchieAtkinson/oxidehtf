@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use color_eyre::owo_colors::OwoColorize;
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     RwLock,
@@ -10,21 +9,6 @@ use crate::{
     events::Event,
     test_runner::{TestData, TestRunning, TestState},
 };
-
-#[derive(Debug, Clone)]
-pub struct UserInput {
-    pub prompt: String,
-    pub input: String,
-}
-
-impl UserInput {
-    pub fn new(prompt: impl Into<String>) -> Self {
-        Self {
-            prompt: prompt.into(),
-            input: Default::default(),
-        }
-    }
-}
 
 pub struct TextInput {
     event_tx: UnboundedSender<Event>,
