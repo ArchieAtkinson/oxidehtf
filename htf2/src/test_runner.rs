@@ -32,11 +32,16 @@ impl TestData {
 }
 
 #[derive(Debug, Clone)]
+pub enum UserDataType {
+    Input(String),
+    Measurement(MeasurementDefinition),
+}
+
+#[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
-    pub user_inputs: IndexMap<String, String>,
-    pub measurements: IndexMap<String, MeasurementDefinition>,
+    pub user_data: IndexMap<String, UserDataType>,
 }
 
 #[derive(Debug, Clone)]
@@ -149,23 +154,25 @@ impl DerefMut for TestData {
 impl std::fmt::Display for TestMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} - {}", self.name, self.state)?;
-        if !self.user_inputs.is_empty() {
-            write!(f, "\n     Operator Input(s)")?;
-            for input in self.user_inputs.clone() {
-                write!(f, "\n        Prompt: {}", input.0)?;
-                if !input.1.is_empty() {
-                    write!(f, "\n        Input: {}\n", input.1)?;
-                } else {
-                    write!(f, "\n        Input: <Waiting For Input>\n")?;
-                }
-            }
+        if self.user_data.is_empty() {
+            return Ok(());
         }
-
-        if !self.measurements.is_empty() {
-            write!(f, "\n     Measurements")?;
-            for measurement in self.measurements.clone() {
-                write!(f, "\n        Name: {}", measurement.0)?;
-                write!(f, "\n        Input: {:?}\n", measurement.1.value)?;
+        for (key, value) in self.user_data.clone().iter().rev() {
+            match value {
+                UserDataType::Input(i) => {
+                    write!(f, "\n     Operator Input")?;
+                    write!(f, "\n        Prompt: {}", key)?;
+                    if !i.is_empty() {
+                        write!(f, "\n        Input: {}\n", i)?;
+                    } else {
+                        write!(f, "\n        Input: <Waiting For Input>\n")?;
+                    }
+                }
+                UserDataType::Measurement(m) => {
+                    write!(f, "\n     Measurement")?;
+                    write!(f, "\n        Name: {}", key)?;
+                    write!(f, "\n        Input: {:?}\n", m.value)?;
+                }
             }
         }
         Ok(())

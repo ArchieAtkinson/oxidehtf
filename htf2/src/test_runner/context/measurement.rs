@@ -2,7 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{mpsc::UnboundedSender, RwLock};
 
-use crate::{events::Event, test_runner::TestData, TestFailure};
+use crate::{
+    events::Event,
+    test_runner::{TestData, UserDataType},
+    TestFailure,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -58,8 +62,8 @@ impl Measurements {
         self.test_state
             .blocking_write()
             .current_test()
-            .measurements
-            .insert(name.into(), def.clone());
+            .user_data
+            .insert(name.into(), UserDataType::Measurement(def.clone()));
         if self.event_tx.send(Event::UpdatedTestData).is_err() {
             return Err(TestFailure::MeasurementError);
         }

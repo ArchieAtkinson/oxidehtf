@@ -37,7 +37,7 @@ impl UserTextInput {
         let current_test = data[current_index].clone();
         match current_test.state {
             TestState::Running(TestRunning::WaitingForInput) => Ok(current_test
-                .user_inputs
+                .user_data
                 .last()
                 .ok_or_eyre("Failed to get latest user_input")?
                 .0

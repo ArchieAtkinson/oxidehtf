@@ -34,8 +34,7 @@ pub fn gen_test_data<T>(
             .map(|n| TestMetadata {
                 name: *n,
                 state: TestState::InQueue,
-                user_inputs: IndexMap::new(),
-                measurements: IndexMap::new(),
+                user_data: IndexMap::new(),
             })
             .collect(),
         current_index: 0,

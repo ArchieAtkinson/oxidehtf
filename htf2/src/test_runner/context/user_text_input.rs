@@ -7,7 +7,7 @@ use tokio::sync::{
 
 use crate::{
     events::Event,
-    test_runner::{TestData, TestRunning, TestState},
+    test_runner::{TestData, TestRunning, TestState, UserDataType},
 };
 
 pub struct TextInput {
@@ -34,8 +34,8 @@ impl TextInput {
         self.test_data
             .blocking_write()
             .current_test()
-            .user_inputs
-            .insert(prompt.clone(), String::new());
+            .user_data
+            .insert(prompt.clone(), UserDataType::Input(String::new()));
 
         self.test_data.blocking_write().current_test().state =
             TestState::Running(TestRunning::WaitingForInput);
@@ -49,9 +49,9 @@ impl TextInput {
         let lock = &mut self.test_data.blocking_write();
         *lock
             .current_test()
-            .user_inputs
+            .user_data
             .get_mut(&prompt)
-            .expect("No Inputs Requested") = input.clone();
+            .expect("No Inputs Requested") = UserDataType::Input(input.clone());
 
         lock.current_test().state = TestState::Running(TestRunning::Running);
 

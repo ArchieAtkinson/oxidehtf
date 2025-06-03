@@ -8,9 +8,8 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let mod_name = &input.ident;
     let mut test_functions_pointers = Vec::new();
+    let mut test_functions_names = Vec::new();
     let mut processed_items = Vec::new();
-
-    // let mut foo = Vec::new();
 
     if let Some((brace, items)) = input.content.take() {
         for item in items {
@@ -31,10 +30,8 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     // Make the function public as main is outside of test mod
                     func.vis = Visibility::Public(token::Pub::default());
                     let func_name = &func.sig.ident;
-                    // Generate the htf::Test::new call for this function
-                    test_functions_pointers.push(quote! {
-                        htf2::Test::new(#mod_name::#func_name, stringify!(#func_name))
-                    });
+                    test_functions_pointers.push(quote! { #mod_name::#func_name});
+                    test_functions_names.push(quote! {stringify!(#func_name)});
                 }
                 processed_items.push(syn::Item::Fn(func)); // Add the modified function
             } else {
@@ -48,10 +45,15 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #input // This now contains the module with #[test] attributes removed and functions made public
 
         fn main() -> color_eyre::eyre::Result<()> {
-            let tests = vec![
-                #(#test_functions_pointers),*
-            ];
-            htf2::run_tests(tests)
+
+            use crate::#mod_name::Fixture;
+
+            let (funcs, data) = htf2::gen_test_data(
+                vec![#(#test_functions_pointers),*],
+                vec![#(#test_functions_names),*]);
+            let context = Fixture::default();
+            htf2::run_tests(funcs, data, context)
+
         }
     };
 
