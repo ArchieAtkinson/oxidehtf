@@ -2,9 +2,9 @@
 use color_eyre::Result;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::Style,
+    style::{Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, Gauge, List, Paragraph, Wrap},
+    widgets::{Block, Gauge, List, Paragraph, Row, Table, Wrap},
     Frame,
 };
 use tokio::sync::mpsc;
@@ -49,7 +49,7 @@ impl TestStatusDisplay {
 
         let progress_percentage = (progress_ratio * 100.0) as i32;
         let bar = Gauge::default()
-            .gauge_style(Style::new().black().on_white().bold())
+            .gauge_style(Style::new().white().on_blue().bold())
             .label(format!(
                 "Test Suite Progress: {}% ({}/{})",
                 progress_percentage, tests_finished as i32, total_tests as i32
@@ -65,21 +65,51 @@ impl TestStatusDisplay {
             _ => false,
         });
 
-        let text = {
+        let text: String = {
             if let Some(current_test) = current_test {
-                let data = current_test.clone();
-                format!("{}", data)
+                current_test.name.into()
             } else {
                 "No Running Test".into()
             }
         };
 
-        let test = Paragraph::new(text).block(
-            Block::bordered()
-                .title("Current Test")
-                .title_style(Style::default().bold()),
-        );
-        frame.render_widget(test, area);
+        let mut rows = Vec::new();
+
+        if let Some(current_test) = current_test {
+            for data in &current_test.user_data {
+                let name = data.0.clone();
+                let Some(value) = data.1.value.clone() else {
+                    break;
+                };
+                let value = format!("{}", value);
+                let unit = data.1.unit.clone().unwrap_or("None".into());
+                let row = Row::new(vec![name.into(), value, unit.into()]);
+                rows.push(row);
+            }
+        }
+
+        let rows = rows.iter_mut().enumerate().map(|(i, r)| {
+            if i % 2 == 0 {
+                r.clone().black().on_white()
+            } else {
+                r.clone()
+            }
+        });
+
+        // Columns widths are constrained in the same way as Layout...
+        let widths = [Constraint::Min(5), Constraint::Min(5), Constraint::Min(5)];
+        let table = Table::new(rows, widths)
+            .block(
+                Block::bordered()
+                    .title(format!(" Current Test: {} ", text))
+                    .title_style(Style::default().bold()),
+            )
+            .header(
+                Row::new(vec!["Measurement Name", "Value", "Units"])
+                    .style(Style::new().underlined()),
+            );
+
+        frame.render_widget(table, area);
     }
 
     fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
@@ -156,12 +186,12 @@ impl Component for TestStatusDisplay {
         self.render_progress(frame, area.test_progress, data);
 
         let [current_test, list_tests] =
-            Layout::vertical([Constraint::Length(20), Constraint::Min(1)]).areas(area.test_display);
+            Layout::vertical([Constraint::Length(10), Constraint::Min(1)]).areas(area.test_display);
 
         self.render_current_test(frame, current_test, data);
 
         let [completed_area, waiting_area] =
-            Layout::horizontal([Constraint::Ratio(3, 5), Constraint::Ratio(2, 5)])
+            Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                 .areas(list_tests);
 
         self.render_completed_tests(frame, completed_area, data);

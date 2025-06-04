@@ -107,6 +107,9 @@ impl App {
                         .send(Action::TerminalInput(crossterm_event))?;
                 }
             }
+            Event::UserInputPrompt(s) => {
+                self.action_tx.send(Action::UserInputPrompt(s))?;
+            }
             _ => (),
         }
 

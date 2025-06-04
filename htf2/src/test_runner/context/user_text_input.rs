@@ -7,7 +7,7 @@ use tokio::sync::{
 
 use crate::{
     events::Event,
-    test_runner::{TestData, TestRunning, TestState, UserDataType},
+    test_runner::{TestData, TestRunning, TestState},
 };
 
 pub struct TextInput {
@@ -31,11 +31,10 @@ impl TextInput {
 
     pub fn request(&mut self, prompt: impl Into<String>) -> String {
         let prompt = prompt.into();
-        self.test_data
-            .blocking_write()
-            .current_test()
-            .user_data
-            .insert(prompt.clone(), UserDataType::Input(String::new()));
+
+        self.event_tx
+            .send(Event::UserInputPrompt(prompt.into()))
+            .expect("Failed to send user Prompt");
 
         self.test_data.blocking_write().current_test().state =
             TestState::Running(TestRunning::WaitingForInput);
@@ -46,14 +45,8 @@ impl TextInput {
 
         let input = self.input_rx.blocking_recv().expect("No Input");
 
-        let lock = &mut self.test_data.blocking_write();
-        *lock
-            .current_test()
-            .user_data
-            .get_mut(&prompt)
-            .expect("No Inputs Requested") = UserDataType::Input(input.clone());
-
-        lock.current_test().state = TestState::Running(TestRunning::Running);
+        self.test_data.blocking_write().current_test().state =
+            TestState::Running(TestRunning::Running);
 
         self.event_tx
             .send(Event::UpdatedTestData)

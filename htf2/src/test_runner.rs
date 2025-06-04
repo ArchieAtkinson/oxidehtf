@@ -32,16 +32,10 @@ impl TestData {
 }
 
 #[derive(Debug, Clone)]
-pub enum UserDataType {
-    Input(String),
-    Measurement(MeasurementDefinition),
-}
-
-#[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
     pub state: TestState,
-    pub user_data: IndexMap<String, UserDataType>,
+    pub user_data: IndexMap<String, MeasurementDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -151,38 +145,38 @@ impl DerefMut for TestData {
     }
 }
 
-impl std::fmt::Display for TestMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} - {}", self.name, self.state)?;
-        if self.user_data.is_empty() {
-            return Ok(());
-        }
-        for (key, value) in self.user_data.clone().iter().rev() {
-            match value {
-                UserDataType::Input(i) => {
-                    write!(f, "\n     Operator Input")?;
-                    write!(f, "\n        Prompt: {}", key)?;
-                    if !i.is_empty() {
-                        write!(f, "\n        Input: {}\n", i)?;
-                    } else {
-                        write!(f, "\n        Input: <Waiting For Input>\n")?;
-                    }
-                }
-                UserDataType::Measurement(m) => {
-                    write!(f, "\n     Measurement")?;
-                    write!(f, "\n        Name: {}", key)?;
+// impl std::fmt::Display for TestMetadata {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{} - {}", self.name, self.state)?;
+//         if self.user_data.is_empty() {
+//             return Ok(());
+//         }
+//         for (key, value) in self.user_data.clone().iter().rev() {
+//             match value {
+//                 UserDataType::Input(i) => {
+//                     write!(f, "\n     Operator Input")?;
+//                     write!(f, "\n        Prompt: {}", key)?;
+//                     if !i.is_empty() {
+//                         write!(f, "\n        Input: {}\n", i)?;
+//                     } else {
+//                         write!(f, "\n        Input: <Waiting For Input>\n")?;
+//                     }
+//                 }
+//                 UserDataType::Measurement(m) => {
+//                     write!(f, "\n     Measurement")?;
+//                     write!(f, "\n        Name: {}", key)?;
 
-                    if let Some(value) = &m.value {
-                        write!(f, "\n        Input: {}\n", value)?;
-                    } else {
-                        write!(f, "\n        Input: <Waiting For Input>\n")?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
+//                     if let Some(value) = &m.value {
+//                         write!(f, "\n        Input: {}\n", value)?;
+//                     } else {
+//                         write!(f, "\n        Input: <Waiting For Input>\n")?;
+//                     }
+//                 }
+//             }
+//         }
+//         Ok(())
+//     }
+// }
 
 impl std::fmt::Display for TestState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

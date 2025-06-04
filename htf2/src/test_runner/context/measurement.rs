@@ -2,11 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{mpsc::UnboundedSender, RwLock};
 
-use crate::{
-    events::Event,
-    test_runner::{TestData, UserDataType},
-    TestFailure,
-};
+use crate::{events::Event, test_runner::TestData, TestFailure};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -21,7 +17,7 @@ pub enum DataTypes {
 
 #[derive(Debug, Clone)]
 pub struct MeasurementDefinition {
-    pub unit: Option<Unit>,
+    pub unit: Option<String>,
     pub range: Option<(f64, f64)>,
     pub value: Option<DataTypes>,
 }
@@ -69,7 +65,8 @@ impl Measurements {
             .blocking_write()
             .current_test()
             .user_data
-            .insert(name.into(), UserDataType::Measurement(def.clone()));
+            .insert(name.into(), def.clone());
+
         if self.event_tx.send(Event::UpdatedTestData).is_err() {
             return Err(TestFailure::MeasurementError);
         }
@@ -88,7 +85,7 @@ impl Measurements {
     pub(crate) fn update_definition(
         &mut self,
         name: &str,
-        unit: Option<Unit>,
+        unit: Option<String>,
         range: Option<(f64, f64)>,
     ) {
         if let Some(def) = self.definitions.get_mut(name) {
@@ -101,13 +98,13 @@ impl Measurements {
 pub struct MeasurementSetter<'a> {
     manager: &'a mut Measurements,
     name: String,
-    unit: Option<Unit>,
+    unit: Option<String>,
     range: Option<(f64, f64)>,
 }
 
 impl<'a> MeasurementSetter<'a> {
-    pub fn with_unit(mut self, unit: Unit) -> Self {
-        self.unit = Some(unit);
+    pub fn with_unit(mut self, unit: impl Into<String>) -> Self {
+        self.unit = Some(unit.into());
         self
     }
 

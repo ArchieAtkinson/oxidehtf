@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use cli_log::*;
-use color_eyre::{eyre::Result, owo_colors::OwoColorize};
-use htf2::{SysContext, TestLifecycle, Unit};
+use color_eyre::eyre::Result;
+use htf2::{SysContext, TestLifecycle};
 
 #[derive(Default)]
 pub struct Fixture {}
@@ -18,14 +18,19 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
 
     htf2::assert_eq!(input, "Test");
 
+    context
+        .measurements
+        .measure("First Input Value")
+        .set_str(&input)?;
+
     std::thread::sleep(Duration::from_secs(1));
 
     context
         .measurements
-        .measure("Test")
-        .with_unit(Unit::Volts)
+        .measure("A Voltage Measurement")
+        .with_unit("V")
         .in_range(0.0, 10.0)
-        .set(1.0)?;
+        .set(1.5)?;
 
     context
         .measurements
@@ -34,7 +39,7 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
 
     let input = context.text_input.request("Second Prompt");
 
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(2));
 
     info!("{}", input);
 

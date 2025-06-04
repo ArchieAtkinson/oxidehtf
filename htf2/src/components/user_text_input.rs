@@ -1,4 +1,4 @@
-use color_eyre::eyre::{OptionExt, Result};
+use color_eyre::eyre::Result;
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -8,12 +8,7 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{
-    actions::Action,
-    events::Event,
-    test_runner::{TestData, TestRunning, TestState},
-    ui::UiAreas,
-};
+use crate::{actions::Action, events::Event, test_runner::TestData, ui::UiAreas};
 
 use super::Component;
 
@@ -21,6 +16,7 @@ pub struct UserTextInput {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
     event_tx: Option<mpsc::UnboundedSender<Event>>,
     txt_input: tui_input::Input,
+    prompt: String,
 }
 
 impl UserTextInput {
@@ -29,25 +25,11 @@ impl UserTextInput {
             action_tx: Default::default(),
             event_tx: Default::default(),
             txt_input: Default::default(),
+            prompt: String::new(),
         }
     }
 
-    fn set_prompt(&self, data: &TestData) -> Result<String> {
-        let current_index = data.current_index;
-        let current_test = data[current_index].clone();
-        match current_test.state {
-            TestState::Running(TestRunning::WaitingForInput) => Ok(current_test
-                .user_data
-                .last()
-                .ok_or_eyre("Failed to get latest user_input")?
-                .0
-                .clone()),
-            _ => Ok("No Input Currently Required".into()),
-        }
-    }
-
-    fn draw_input(&mut self, frame: &mut Frame, area: Rect, data: &TestData) -> Result<()> {
-        let prompt = self.set_prompt(data)?;
+    fn draw_input(&mut self, frame: &mut Frame, area: Rect, _data: &TestData) -> Result<()> {
         // keep 2 for borders and 1 for cursor
         let width = area.width.max(3) - 3;
         let scroll = self.txt_input.visual_scroll(width as usize);
@@ -55,7 +37,7 @@ impl UserTextInput {
             .scroll((0, scroll as u16))
             .block(
                 Block::bordered()
-                    .title(prompt)
+                    .title(self.prompt.clone())
                     .title_style(Style::default().bold()),
             );
         frame.render_widget(input, area);
@@ -94,7 +76,9 @@ impl Component for UserTextInput {
             Action::TerminalInput(e) => {
                 let _ = self.txt_input.handle_event(&e);
             }
+            Action::UserInputPrompt(v) => self.prompt = v,
             Action::SendInput => {
+                self.prompt = "No Input Required".into();
                 return Ok(Some(Action::UserInputValue(
                     self.txt_input.value_and_reset(),
                 )));

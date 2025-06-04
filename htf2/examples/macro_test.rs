@@ -4,7 +4,7 @@ mod tests {
 
     use cli_log::*;
     use color_eyre::eyre::Result;
-    use htf2::{SysContext, TestLifecycle, Unit};
+    use htf2::{SysContext, TestLifecycle};
 
     #[derive(Default)]
     pub struct Fixture {}
@@ -26,7 +26,7 @@ mod tests {
         context
             .measurements
             .measure("Test")
-            .with_unit(Unit::Volts)
+            .with_unit("V")
             .in_range(0.0, 10.0)
             .set(1.0)?;
 
