@@ -1,9 +1,10 @@
 use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
-    time::Instant,
+    time::Duration,
 };
 
+use chrono::{DateTime, FixedOffset};
 use color_eyre::Result;
 use indexmap::IndexMap;
 use tokio::sync::{mpsc, RwLock};
@@ -49,12 +50,12 @@ impl TestDataManager {
                     name: *n,
                     state: TestState::InQueue,
                     user_data: IndexMap::new(),
-                    start_time: Instant::now(),
-                    end_time: Instant::now(),
+                    duration: Duration::default(),
                 })
                 .collect(),
             current_index: 0,
             dut_id: String::new(),
+            start_time: Default::default(),
         };
 
         Self {
@@ -96,14 +97,14 @@ impl TestDataManager {
 #[derive(Debug, Clone)]
 pub struct TestMetadata {
     pub name: &'static str,
-    pub start_time: Instant,
-    pub end_time: Instant,
+    pub duration: Duration,
     pub state: TestState,
     pub user_data: IndexMap<String, MeasurementDefinition>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TestData {
+    pub start_time: DateTime<FixedOffset>,
     pub dut_id: String,
     pub test_metadata: Vec<TestMetadata>,
     pub current_index: usize,

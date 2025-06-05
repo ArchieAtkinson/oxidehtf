@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use chrono::{FixedOffset, Utc};
 use cli_log::*;
 use color_eyre::Result;
 use context::SysContext;
@@ -50,6 +51,11 @@ impl<T: TestLifecycle> TestRunner<T> {
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
+        self.data_manager.blocking_write(|d| {
+            let fixed_offset = FixedOffset::west_opt(0).unwrap();
+            d.start_time = Utc::now().with_timezone(&fixed_offset);
+            Ok(())
+        })?;
         let num_tests = self.data_manager.blocking_read(|d| Ok(d.len()))?;
 
         info!("Loop");
@@ -60,12 +66,17 @@ impl<T: TestLifecycle> TestRunner<T> {
             self.data_manager.blocking_write(|d| {
                 d.current_index = index;
                 d.current_test_mut().state = TestState::Running(TestRunning::Running);
-                d.current_test_mut().start_time = Instant::now();
                 Ok(())
             })?;
 
             self.fixture.before_test()?;
+
+            let start_time = Instant::now();
+
             let result = (self.funcs.funcs[index])(&mut self.context, &mut self.fixture);
+
+            let test_duration = Instant::now() - start_time;
+
             self.fixture.after_test()?;
 
             self.data_manager.blocking_write(|d| {
@@ -76,7 +87,7 @@ impl<T: TestLifecycle> TestRunner<T> {
                         TestState::Done(TestDone::Failed)
                     }
                 };
-                d.current_test_mut().end_time = Instant::now();
+                d.current_test_mut().duration = test_duration;
                 Ok(())
             })?;
         }
@@ -108,11 +119,12 @@ impl<T: TestLifecycle> TestRunner<T> {
                 _ => TestCaseStatus::non_success(NonSuccessKind::Error),
             };
             let mut test_case = TestCase::new(test.name, test_case_result);
-            test_case.set_time(test.end_time - test.start_time);
+            test_case.set_time(test.duration);
             test_suite.add_test_case(test_case);
         }
 
         report.add_test_suite(test_suite);
+        report.timestamp = Some(data.start_time);
 
         let junit_file = std::fs::File::create("junit-report.xml")?;
 
