@@ -16,6 +16,7 @@ async-trait = "0.1.88"
 indoc = "2.0.6"
 indexmap = "2.9.0"
 thiserror = "2.0.12"
+quick-junit = "0.5.1"
 
 [dev-dependencies]
 

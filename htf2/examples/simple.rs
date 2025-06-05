@@ -28,7 +28,7 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
     context
         .measurements
         .measure("A Voltage Measurement")
-        .with_unit("V")
+        .with_unit("Volts")
         .in_range(0.0, 10.0)
         .set(1.5)?;
 

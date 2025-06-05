@@ -1,3 +1,4 @@
 /target
 /.direnv
 *.log
+junit-report.xml

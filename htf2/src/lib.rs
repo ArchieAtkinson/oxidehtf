@@ -8,7 +8,7 @@ pub(crate) mod ui;
 use cli_log::*;
 use color_eyre::eyre::Result;
 use indexmap::IndexMap;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use test_runner::{
     context::{measurement::Measurements, user_text_input::TextInput},
     FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState,
@@ -35,6 +35,8 @@ pub fn gen_test_data<T>(
                 name: *n,
                 state: TestState::InQueue,
                 user_data: IndexMap::new(),
+                start_time: Instant::now(),
+                end_time: Instant::now(),
             })
             .collect(),
         current_index: 0,
