@@ -48,11 +48,11 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             use crate::#mod_name::Fixture;
 
-            let (funcs, data) = htf2::gen_test_data(
-                vec![#(#test_functions_pointers),*],
-                vec![#(#test_functions_names),*]);
             let context = Fixture::default();
-            htf2::run_tests(funcs, data, context)
+            htf2::run_tests(
+                vec![#(#test_functions_pointers),*],
+                vec![#(#test_functions_names),*],
+                context)
 
         }
     };

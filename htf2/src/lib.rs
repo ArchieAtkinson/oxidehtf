@@ -7,54 +7,16 @@ pub(crate) mod ui;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
-use indexmap::IndexMap;
-use std::{sync::Arc, time::Instant};
+use test_runner::test_data::TestDataManager;
 use test_runner::{
     context::{dut::DUT, measurement::Measurements, user_text_input::TextInput},
-    FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState,
+    FuncType, TestFunctions, TestRunner,
 };
-use tokio::{
-    runtime::Runtime,
-    sync::{mpsc, RwLock},
-};
+use tokio::{runtime::Runtime, sync::mpsc};
 
 pub use test_runner::context::{measurement::Unit, SysContext};
 pub use test_runner::errors::TestFailure;
 pub use test_runner::lifecycle::TestLifecycle;
-
-pub fn gen_test_data<T>(
-    funcs: Vec<FuncType<T>>,
-    names: Vec<&'static str>,
-) -> (TestFunctions<T>, TestData) {
-    let test_funcs = TestFunctions { funcs };
-
-    let test_data = TestData {
-        data: names
-            .iter()
-            .map(|n| TestMetadata {
-                name: *n,
-                state: TestState::InQueue,
-                user_data: IndexMap::new(),
-                start_time: Instant::now(),
-                end_time: Instant::now(),
-            })
-            .collect(),
-        current_index: 0,
-        dut_id: String::new(),
-    };
-
-    (test_funcs, test_data)
-}
-
-#[macro_export]
-macro_rules! register_tests {
-    ($($func_name:ident),*) => {
-        htf2::gen_test_data(
-            vec![$($func_name),*],
-            vec![$(stringify!($func_name)),*]
-        )
-    };
-}
 
 #[macro_export]
 macro_rules! assert_eq {
@@ -77,9 +39,16 @@ macro_rules! assert_eq {
     }};
 }
 
+#[macro_export]
+macro_rules! register_tests {
+    ($($func_name:ident),*) => {
+        (vec![$($func_name),*], vec![$(stringify!($func_name)),*]);
+    };
+}
+
 pub fn run_tests<T: Send + 'static + TestLifecycle>(
-    funcs: TestFunctions<T>,
-    data: TestData,
+    funcs: Vec<FuncType<T>>,
+    names: Vec<&'static str>,
     fixture: T,
 ) -> Result<()> {
     init_cli_log!();
@@ -92,16 +61,22 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let (input_tx, input_rx) = mpsc::unbounded_channel();
 
-        let test_data = Arc::new(RwLock::new(data));
+        let test_funcs = TestFunctions { funcs };
+        let test_data = TestDataManager::new(names, event_tx.clone());
 
         let context = SysContext {
             text_input: TextInput::new(event_tx.clone(), input_rx, test_data.clone()),
-            measurements: Measurements::new(test_data.clone(), event_tx.clone()),
+            measurements: Measurements::new(test_data.clone()),
             dut: DUT::new(test_data.clone()),
         };
 
-        let mut test_runner =
-            TestRunner::new(funcs, test_data.clone(), event_tx.clone(), context, fixture);
+        let mut test_runner = TestRunner::new(
+            test_funcs,
+            test_data.clone(),
+            event_tx.clone(),
+            context,
+            fixture,
+        );
 
         tokio::task::spawn_blocking(move || test_runner.run());
 

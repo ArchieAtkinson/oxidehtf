@@ -1,77 +1,30 @@
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-    time::Instant,
-};
+use std::time::Instant;
 
 use cli_log::*;
 use color_eyre::Result;
-use context::{measurement::MeasurementDefinition, SysContext};
+use context::SysContext;
 use errors::TestFailure;
-use indexmap::IndexMap;
 use lifecycle::TestLifecycle;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use tokio::sync::{mpsc, RwLock};
+use test_data::{TestDataManager, TestDone, TestRunning, TestState};
+use tokio::sync::mpsc;
 
 use crate::events::Event;
 
 pub mod context;
 pub mod errors;
 pub mod lifecycle;
+pub mod test_data;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
-
-#[derive(Debug, Clone)]
-pub struct TestData {
-    pub dut_id: String,
-    pub data: Vec<TestMetadata>,
-    pub current_index: usize,
-}
-
-impl TestData {
-    pub fn current_test(&mut self) -> &mut TestMetadata {
-        &mut self.data[self.current_index]
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TestMetadata {
-    pub name: &'static str,
-    pub start_time: Instant,
-    pub end_time: Instant,
-    pub state: TestState,
-    pub user_data: IndexMap<String, MeasurementDefinition>,
-}
 
 #[derive(Debug, Clone)]
 pub struct TestFunctions<T> {
     pub funcs: Vec<FuncType<T>>,
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub enum TestState {
-    #[default]
-    InQueue,
-    Running(TestRunning),
-    Done(TestDone),
-}
-
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub enum TestRunning {
-    #[default]
-    Running,
-    WaitingForInput,
-}
-
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
-pub enum TestDone {
-    #[default]
-    Passed,
-    Failed,
-}
-
 pub struct TestRunner<T: TestLifecycle> {
-    data: Arc<RwLock<TestData>>,
+    data_manager: TestDataManager,
     funcs: TestFunctions<T>,
     event_tx: mpsc::UnboundedSender<Event>,
     context: SysContext,
@@ -81,13 +34,13 @@ pub struct TestRunner<T: TestLifecycle> {
 impl<T: TestLifecycle> TestRunner<T> {
     pub fn new(
         funcs: TestFunctions<T>,
-        data: Arc<RwLock<TestData>>,
+        data: TestDataManager,
         event_tx: mpsc::UnboundedSender<Event>,
         context: SysContext,
         fixture: T,
     ) -> Self {
         Self {
-            data,
+            data_manager: data,
             funcs,
             event_tx,
             context,
@@ -97,35 +50,35 @@ impl<T: TestLifecycle> TestRunner<T> {
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
-        let num_tests = self.data.blocking_read().data.len();
+        let num_tests = self.data_manager.blocking_read(|d| Ok(d.len()))?;
 
         info!("Loop");
 
         self.fixture.setup()?;
 
         for index in 0..num_tests {
-            let mut data_guard = self.data.blocking_write();
-            data_guard.current_index = index;
-            data_guard.current_test().state = TestState::Running(TestRunning::Running);
-            data_guard.current_test().start_time = Instant::now();
-            drop(data_guard);
-            self.event_tx.send(Event::UpdatedTestData)?;
+            self.data_manager.blocking_write(|d| {
+                d.current_index = index;
+                d.current_test_mut().state = TestState::Running(TestRunning::Running);
+                d.current_test_mut().start_time = Instant::now();
+                Ok(())
+            })?;
 
             self.fixture.before_test()?;
             let result = (self.funcs.funcs[index])(&mut self.context, &mut self.fixture);
             self.fixture.after_test()?;
 
-            let mut data_guard = self.data.blocking_write();
-            data_guard[index].state = match result {
-                Ok(_) => TestState::Done(TestDone::Passed),
-                Err(e) => {
-                    error!("{:#?}", e);
-                    TestState::Done(TestDone::Failed)
-                }
-            };
-            data_guard.current_test().end_time = Instant::now();
-            drop(data_guard);
-            self.event_tx.send(Event::UpdatedTestData)?;
+            self.data_manager.blocking_write(|d| {
+                d.test_metadata[index].state = match result {
+                    Ok(_) => TestState::Done(TestDone::Passed),
+                    Err(e) => {
+                        error!("{:#?}", e);
+                        TestState::Done(TestDone::Failed)
+                    }
+                };
+                d.current_test_mut().end_time = Instant::now();
+                Ok(())
+            })?;
         }
 
         self.event_tx.send(Event::TestsCompleted)?;
@@ -143,9 +96,9 @@ impl<T: TestLifecycle> TestRunner<T> {
         let mut report = Report::new("htf2-run");
         let mut test_suite = TestSuite::new("htf2-suite");
 
-        let tests = self.data.blocking_read().data.clone();
+        let data = self.data_manager.blocking_get_copy();
 
-        for test in tests {
+        for test in data.test_metadata {
             let test_case_result = match test.state {
                 TestState::Done(r) => match r {
                     TestDone::Passed => TestCaseStatus::success(),
@@ -166,20 +119,6 @@ impl<T: TestLifecycle> TestRunner<T> {
         report.serialize(junit_file)?;
 
         Ok(())
-    }
-}
-
-impl Deref for TestData {
-    type Target = Vec<TestMetadata>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl DerefMut for TestData {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
     }
 }
 

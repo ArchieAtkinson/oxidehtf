@@ -1,8 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use tokio::sync::{mpsc::UnboundedSender, RwLock};
-
-use crate::{events::Event, test_runner::TestData, TestFailure};
+use crate::{test_runner::TestDataManager, TestFailure};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -24,16 +22,14 @@ pub struct MeasurementDefinition {
 
 pub struct Measurements {
     definitions: HashMap<String, MeasurementDefinition>,
-    test_data: Arc<RwLock<TestData>>,
-    event_tx: UnboundedSender<Event>,
+    test_data: TestDataManager,
 }
 
 impl Measurements {
-    pub fn new(test_state: Arc<RwLock<TestData>>, event_tx: UnboundedSender<Event>) -> Self {
+    pub fn new(test_state: TestDataManager) -> Self {
         Measurements {
             definitions: HashMap::new(),
             test_data: test_state,
-            event_tx,
         }
     }
 
@@ -62,14 +58,13 @@ impl Measurements {
         def.value = Some(value.clone());
 
         self.test_data
-            .blocking_write()
-            .current_test()
-            .user_data
-            .insert(name.into(), def.clone());
-
-        if self.event_tx.send(Event::UpdatedTestData).is_err() {
-            return Err(TestFailure::MeasurementError);
-        }
+            .blocking_write(|d| {
+                d.current_test_mut()
+                    .user_data
+                    .insert(name.into(), def.clone());
+                Ok(())
+            })
+            .unwrap();
 
         if let DataTypes::F64(value) = value {
             if let Some((min, max)) = def.range {

@@ -8,7 +8,7 @@ use ratatui::{
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{actions::Action, events::Event, test_runner::TestData, ui::UiAreas};
+use crate::{actions::Action, events::Event, test_runner::test_data::TestData, ui::UiAreas};
 
 use super::Component;
 

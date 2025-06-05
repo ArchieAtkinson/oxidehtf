@@ -1,15 +1,13 @@
-use std::sync::Arc;
-
 use cli_log::*;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 
 use crate::{
     actions::Action,
     components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
     events::Event,
-    test_runner::TestData,
+    test_runner::test_data::TestDataManager,
     ui::Ui,
 };
 
@@ -23,7 +21,7 @@ pub enum AppState {
 pub struct App {
     ui: Ui,
     state: AppState,
-    test_data: Arc<RwLock<TestData>>,
+    test_data: TestDataManager,
     components: Vec<Box<dyn Component>>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -34,7 +32,7 @@ pub struct App {
 
 impl App {
     pub fn new(
-        data: Arc<RwLock<TestData>>,
+        test_data: TestDataManager,
         event_rx: mpsc::UnboundedReceiver<Event>,
         event_tx: mpsc::UnboundedSender<Event>,
         input_tx: mpsc::UnboundedSender<String>,
@@ -43,7 +41,7 @@ impl App {
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
-            test_data: data,
+            test_data,
             components: vec![
                 Box::new(TestStatusDisplay::new()),
                 Box::new(UserTextInput::new()),
@@ -71,7 +69,7 @@ impl App {
         while self.state() != AppState::Done {
             self.handle_event().await?;
             self.handle_actions().await?;
-            let state = self.test_data.read().await;
+            let state = self.test_data.get_copy().await;
             self.ui.render(|f, a| {
                 for component in self.components.iter_mut() {
                     component.draw(f, &a, &state)?;

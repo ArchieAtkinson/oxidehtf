@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 use crate::{
     actions::Action,
     events::Event,
-    test_runner::{TestData, TestState},
+    test_runner::test_data::{TestData, TestState},
     ui::UiAreas,
 };
 
@@ -111,7 +111,7 @@ impl TestStatusDisplay {
             .block(
                 Block::bordered()
                     .title(format!(
-                        " DUT: {} -  Current Test: {} ",
+                        " DUT: {} - Current Test: {} ",
                         dut, current_test_name,
                     ))
                     .title_style(Style::default().bold()),

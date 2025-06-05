@@ -64,7 +64,7 @@ fn test2_with_longer_name(
 }
 
 fn main() -> Result<()> {
-    let (funcs, data) = htf2::register_tests!(test1, test2_with_longer_name);
+    let (funcs, names) = htf2::register_tests!(test1, test2_with_longer_name);
     let context = Fixture::default();
-    htf2::run_tests(funcs, data, context)
+    htf2::run_tests(funcs, names, context)
 }
