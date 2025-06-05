@@ -12,6 +12,8 @@ impl TestLifecycle for Fixture {}
 fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::TestFailure> {
     info!("Running Test1");
 
+    context.dut.set_via_operator(&mut context.text_input);
+
     let input = context.text_input.request("The answer is 'Test'");
 
     info!("{}", input);

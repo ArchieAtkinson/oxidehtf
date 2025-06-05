@@ -49,11 +49,12 @@ impl TestStatusDisplay {
 
         let progress_percentage = (progress_ratio * 100.0) as i32;
         let bar = Gauge::default()
-            .gauge_style(Style::new().white().on_blue().bold())
+            .gauge_style(Style::new().black().on_white().bold())
             .label(format!(
                 "Test Suite Progress: {}% ({}/{})",
                 progress_percentage, tests_finished as i32, total_tests as i32
             ))
+            .white()
             .ratio(progress_ratio);
 
         frame.render_widget(bar, area);
@@ -65,11 +66,19 @@ impl TestStatusDisplay {
             _ => false,
         });
 
-        let text: String = {
+        let current_test_name: String = {
             if let Some(current_test) = current_test {
                 current_test.name.into()
             } else {
                 "No Running Test".into()
+            }
+        };
+
+        let dut: String = {
+            if data.dut_id.is_empty() {
+                "DUT not set".into()
+            } else {
+                data.dut_id.clone()
             }
         };
 
@@ -101,7 +110,10 @@ impl TestStatusDisplay {
         let table = Table::new(rows, widths)
             .block(
                 Block::bordered()
-                    .title(format!(" Current Test: {} ", text))
+                    .title(format!(
+                        " DUT: {} -  Current Test: {} ",
+                        dut, current_test_name,
+                    ))
                     .title_style(Style::default().bold()),
             )
             .header(

@@ -24,7 +24,7 @@ pub struct MeasurementDefinition {
 
 pub struct Measurements {
     definitions: HashMap<String, MeasurementDefinition>,
-    test_state: Arc<RwLock<TestData>>,
+    test_data: Arc<RwLock<TestData>>,
     event_tx: UnboundedSender<Event>,
 }
 
@@ -32,7 +32,7 @@ impl Measurements {
     pub fn new(test_state: Arc<RwLock<TestData>>, event_tx: UnboundedSender<Event>) -> Self {
         Measurements {
             definitions: HashMap::new(),
-            test_state,
+            test_data: test_state,
             event_tx,
         }
     }
@@ -61,7 +61,7 @@ impl Measurements {
 
         def.value = Some(value.clone());
 
-        self.test_state
+        self.test_data
             .blocking_write()
             .current_test()
             .user_data

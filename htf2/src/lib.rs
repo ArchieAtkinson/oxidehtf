@@ -10,7 +10,7 @@ use color_eyre::eyre::Result;
 use indexmap::IndexMap;
 use std::{sync::Arc, time::Instant};
 use test_runner::{
-    context::{measurement::Measurements, user_text_input::TextInput},
+    context::{dut::DUT, measurement::Measurements, user_text_input::TextInput},
     FuncType, TestData, TestFunctions, TestMetadata, TestRunner, TestState,
 };
 use tokio::{
@@ -40,6 +40,7 @@ pub fn gen_test_data<T>(
             })
             .collect(),
         current_index: 0,
+        dut_id: String::new(),
     };
 
     (test_funcs, test_data)
@@ -96,6 +97,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
         let context = SysContext {
             text_input: TextInput::new(event_tx.clone(), input_rx, test_data.clone()),
             measurements: Measurements::new(test_data.clone(), event_tx.clone()),
+            dut: DUT::new(test_data.clone()),
         };
 
         let mut test_runner =

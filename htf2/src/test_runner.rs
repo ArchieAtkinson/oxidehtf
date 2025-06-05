@@ -23,6 +23,7 @@ pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
 #[derive(Debug, Clone)]
 pub struct TestData {
+    pub dut_id: String,
     pub data: Vec<TestMetadata>,
     pub current_index: usize,
 }
