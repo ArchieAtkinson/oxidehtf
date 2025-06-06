@@ -2,21 +2,22 @@
 
 **NOTE: This project is very alpha and could change at any point**
 
-OxideHTF is a Hardware Test Framework written in Rust which provides a TUI to allow operators to view and interact with tests. This project is inspired by the OpenHTF project that has the same use case.
+OxideHTF is a Hardware Test Framework written in Rust that provides a TUI to allow operators to view and interact with tests. This project is inspired by the OpenHTF project which has the same use case.
 
 OxideHTF provides (or will...):
 - A Test Runner
 - A TUI for monitoring and controlling tests
 - Ability to take input from an operator
-- Surfaces user defined dependencies to each test 
-- Log measurements taken and check there correctness
+- Surfaces user-defined dependencies to each test 
+- Log measurements taken and check their correctness
 
 
 **Feature List:**
 - General
     - Crate docs
     - User docs
-    - Better Examples
+    - Better examples
+    - Tests
 - Test Runner
     - Runs Tests ✅
     - Async Tests
@@ -25,7 +26,7 @@ OxideHTF provides (or will...):
     - Multiple DUTs
     - Test Failures
         - Create more specific errors
-        - Capture more infomations
+        - Capture more information
     - Tests that require some or no dependencies
     - Macros
         - Gather Tests ✅
@@ -200,10 +201,10 @@ mod tests {
 ## OxideHTF vs OpenHTF
 
 The key differences between OxideHTF and OpenHTF are as follows:
-- OxideHTF is written in Rust while OpenHTF is in Python
-- OxideHTF proivdes a TUI for interaction while OpenHTF (primarily) provides a web interface.
+- OxideHTF is written in Rust, while OpenHTF is in Python
+- OxideHTF provides a TUI for interaction, while OpenHTF (primarily) provides a web interface.
 - Hopefully more to come...  
 
-One large benefit to these difference is portability. Having a Rust based test runner allows for a test binary to produced and distributed. This combined with a TUI interface provides a feature rich UI (one day ..) that can be used on almost any system.   
+One large benefit of these differences is portability. Having a Rust-based test runner allows for a test binary to be produced and distributed. This, combined with a TUI interface, provides a feature rich UI (one day ..) that can be used on almost any system.   
 
 
