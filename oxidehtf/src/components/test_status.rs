@@ -1,10 +1,11 @@
 // use cli_log::*;
 use color_eyre::Result;
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, Gauge, List, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Gauge, List, Paragraph, Row, Table, TableState, Wrap},
     Frame,
 };
 use tokio::sync::mpsc;
@@ -21,6 +22,8 @@ use super::Component;
 pub struct TestStatusDisplay {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
     event_tx: Option<mpsc::UnboundedSender<Event>>,
+    current_test_table_state: TableState,
+    is_focused: bool,
 }
 
 impl TestStatusDisplay {
@@ -28,6 +31,8 @@ impl TestStatusDisplay {
         Self {
             action_tx: None,
             event_tx: None,
+            current_test_table_state: TableState::default(),
+            is_focused: false,
         }
     }
 
@@ -60,7 +65,7 @@ impl TestStatusDisplay {
         frame.render_widget(bar, area);
     }
 
-    fn render_current_test(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+    fn render_current_test(&mut self, frame: &mut Frame, area: Rect, data: &TestData) {
         let current_test = data.iter().find(|t| match t.state {
             TestState::Running(_) => true,
             _ => false,
@@ -99,17 +104,24 @@ impl TestStatusDisplay {
 
         let rows = rows.iter_mut().enumerate().map(|(i, r)| {
             if i % 2 == 0 {
-                r.clone().black().on_white()
+                r.clone().black().on_gray()
             } else {
                 r.clone()
             }
         });
+
+        let border_style = if self.is_focused {
+            Style::default().yellow()
+        } else {
+            Style::default()
+        };
 
         // Columns widths are constrained in the same way as Layout...
         let widths = [Constraint::Min(5), Constraint::Min(5), Constraint::Min(5)];
         let table = Table::new(rows, widths)
             .block(
                 Block::bordered()
+                    .border_style(border_style)
                     .title(format!(
                         " DUT: {} - Current Test: {} ",
                         dut, current_test_name,
@@ -119,9 +131,9 @@ impl TestStatusDisplay {
             .header(
                 Row::new(vec!["Measurement Name", "Value", "Units"])
                     .style(Style::new().underlined()),
-            );
-
-        frame.render_widget(table, area);
+            )
+            .highlight_symbol(">>");
+        frame.render_stateful_widget(table, area, &mut self.current_test_table_state);
     }
 
     fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
@@ -170,6 +182,10 @@ impl Component for TestStatusDisplay {
         Ok(())
     }
 
+    fn name(&self) -> &str {
+        "Test Status Display"
+    }
+
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
         Ok(())
@@ -182,6 +198,18 @@ impl Component for TestStatusDisplay {
 
     fn handle_events(&mut self, event: crate::events::Event) -> Result<Option<Action>> {
         match event {
+            Event::CrosstermEvent(crossterm_event) => {
+                if self.is_focused {
+                    if let crossterm::event::Event::Key(key) = crossterm_event {
+                        match key.code {
+                            KeyCode::Char('k') => self.current_test_table_state.select_previous(),
+                            KeyCode::Char('j') => self.current_test_table_state.select_next(),
+                            _ => (),
+                        }
+                    }
+                }
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }
@@ -190,6 +218,18 @@ impl Component for TestStatusDisplay {
         match action {
             _ => Ok(None),
         }
+    }
+
+    fn can_focus(&self) -> bool {
+        true
+    }
+
+    fn focus(&mut self) {
+        self.is_focused = true;
+    }
+
+    fn blur(&mut self) {
+        self.is_focused = false;
     }
 
     fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {

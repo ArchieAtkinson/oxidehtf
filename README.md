@@ -50,6 +50,8 @@ OxideHTF provides (or will...):
     - Native Serial Support
 - TUI
     - MVP ✅
+    - Component Focusing
+        - MVP ✅
     - Control
         - Pausing
         - Restarting
@@ -59,6 +61,7 @@ OxideHTF provides (or will...):
             - Selected Tests
             - Selected Suites
     - Scrollable Sections
+        - MVP ✅
     - Redesign?
         - More info on highlight?
         - More colours

@@ -23,6 +23,7 @@ pub struct App {
     state: AppState,
     test_data: TestDataManager,
     components: Vec<Box<dyn Component>>,
+    current_focus: usize,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
     event_rx: mpsc::UnboundedReceiver<Event>,
@@ -43,9 +44,10 @@ impl App {
             ui: Ui::new(event_tx.clone()),
             test_data,
             components: vec![
-                Box::new(TestStatusDisplay::new()),
                 Box::new(UserTextInput::new()),
+                Box::new(TestStatusDisplay::new()),
             ],
+            current_focus: 0,
             state: Default::default(),
             action_rx,
             action_tx,
@@ -63,6 +65,8 @@ impl App {
         }
 
         self.ui.start();
+
+        self.components[self.current_focus].focus();
 
         info!("Spawning Test Runner");
 
@@ -93,17 +97,14 @@ impl App {
                         KeyCode::Esc => {
                             self.action_tx.send(Action::ExitApp)?;
                         }
-                        KeyCode::Enter if self.state == AppState::WaitingForInput => {
-                            self.action_tx.send(Action::SendInput)?;
+                        KeyCode::Tab => {
+                            self.focus_next();
                         }
                         _ => {}
                     }
                 }
-
-                if self.state == AppState::WaitingForInput {
-                    self.action_tx
-                        .send(Action::TerminalInput(crossterm_event))?;
-                }
+                self.action_tx
+                    .send(Action::TerminalInput(crossterm_event))?;
             }
             Event::UserInputPrompt(s) => {
                 self.action_tx.send(Action::UserInputPrompt(s))?;
@@ -142,5 +143,35 @@ impl App {
 
     fn state(&self) -> AppState {
         self.state
+    }
+
+    fn focus_next(&mut self) {
+        self.components[self.current_focus].blur();
+
+        let len = self.components.len();
+
+        let start_search_index = self.current_focus + 1;
+        let mut next_focus_index = 0;
+
+        let mut found_next_focusable = false;
+
+        for i in 0..len {
+            let index = (start_search_index + i) % len;
+            if self.components[index].can_focus() {
+                next_focus_index = index;
+                found_next_focusable = true;
+                break;
+            }
+        }
+
+        if found_next_focusable {
+            self.components[next_focus_index].focus();
+            self.current_focus = next_focus_index;
+        } else {
+            panic!(
+                "No other focusable components found in the sequence. Current focus remains {}.",
+                self.current_focus
+            );
+        }
     }
 }

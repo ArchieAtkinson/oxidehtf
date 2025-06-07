@@ -1,5 +1,5 @@
 example name:
-    OXIDE_HTF_LOG=debug cargo run --package oxidehtf --example {{ name }}
+    OXIDEHTF_LOG=debug cargo run --package oxidehtf --example {{ name }}
 
 log:
     tail -f oxidehtf.log

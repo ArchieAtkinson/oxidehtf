@@ -33,9 +33,10 @@ impl Measurements {
         }
     }
 
-    pub fn measure(&mut self, name: &str) -> MeasurementSetter<'_> {
+    pub fn measure(&mut self, name: impl Into<String>) -> MeasurementSetter<'_> {
+        let name = name.into();
         self.definitions
-            .entry(name.to_string())
+            .entry(name.clone())
             .or_insert_with(|| MeasurementDefinition {
                 unit: None,
                 range: None,
@@ -44,7 +45,7 @@ impl Measurements {
 
         MeasurementSetter {
             manager: self,
-            name: name.to_string(),
+            name,
             unit: None,
             range: None,
         }
@@ -118,7 +119,7 @@ impl<'a> MeasurementSetter<'a> {
         self.set_internal(DataTypes::F64(value))
     }
 
-    pub fn set_str(self, value: &str) -> Result<(), TestFailure> {
+    pub fn set_str(self, value: impl Into<String>) -> Result<(), TestFailure> {
         self.set_internal(DataTypes::String(value.into()))
     }
 }

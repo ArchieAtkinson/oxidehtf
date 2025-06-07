@@ -11,6 +11,8 @@ pub trait Component {
         Ok(())
     }
 
+    fn name(&self) -> &str;
+
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         let _ = tx;
         Ok(())
@@ -29,6 +31,18 @@ pub trait Component {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let _ = action;
         Ok(None)
+    }
+
+    fn can_focus(&self) -> bool {
+        false
+    }
+
+    fn focus(&mut self) {
+        ()
+    }
+
+    fn blur(&mut self) {
+        ()
     }
 
     fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &TestData) -> Result<()>;

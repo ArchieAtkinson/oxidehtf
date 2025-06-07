@@ -12,20 +12,20 @@ impl TestLifecycle for Fixture {}
 fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
     info!("Running Test1");
 
-    context.dut.set_via_operator(&mut context.text_input);
+    // context.dut.set_via_operator(&mut context.text_input);
 
-    let input = context.text_input.request("The answer is 'Test'");
+    // let input = context.text_input.request("The answer is 'Test'");
 
-    info!("{}", input);
+    // info!("{}", input);
 
-    oxidehtf::assert_eq!(input, "Test");
+    // oxidehtf::assert_eq!(input, "Test");
 
-    context
-        .measurements
-        .measure("First Input Value")
-        .set_str(&input)?;
+    // context
+    //      .measurements
+    //      .measure("First Input Value")
+    //      .set_str(&input)?;
 
-    std::thread::sleep(Duration::from_secs(1));
+    // std::thread::sleep(Duration::from_secs(1));
 
     context
         .measurements
@@ -34,14 +34,15 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxideht
         .in_range(0.0, 10.0)
         .set(1.5)?;
 
-    context
-        .measurements
-        .measure("String Measurement")
-        .set_str("Test Value")?;
-
+    for i in 0..20 {
+        context
+            .measurements
+            .measure(format!("Measurement {i}"))
+            .set_str(format!("Value {i}"))?;
+    }
     let input = context.text_input.request("Second Prompt");
 
-    std::thread::sleep(Duration::from_secs(2));
+    // std::thread::sleep(Duration::from_secs(2));
 
     info!("{}", input);
 

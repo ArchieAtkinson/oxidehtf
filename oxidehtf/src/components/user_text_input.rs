@@ -1,4 +1,5 @@
 use color_eyre::eyre::Result;
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -17,6 +18,7 @@ pub struct UserTextInput {
     event_tx: Option<mpsc::UnboundedSender<Event>>,
     txt_input: tui_input::Input,
     prompt: String,
+    is_focused: bool,
 }
 
 impl UserTextInput {
@@ -26,10 +28,17 @@ impl UserTextInput {
             event_tx: Default::default(),
             txt_input: Default::default(),
             prompt: String::new(),
+            is_focused: false,
         }
     }
 
     fn draw_input(&mut self, frame: &mut Frame, area: Rect, _data: &TestData) -> Result<()> {
+        let border_style = if self.is_focused {
+            Style::default().yellow()
+        } else {
+            Style::default()
+        };
+
         // keep 2 for borders and 1 for cursor
         let width = area.width.max(3) - 3;
         let scroll = self.txt_input.visual_scroll(width as usize);
@@ -37,6 +46,7 @@ impl UserTextInput {
             .scroll((0, scroll as u16))
             .block(
                 Block::bordered()
+                    .border_style(border_style)
                     .title(self.prompt.clone())
                     .title_style(Style::default().bold()),
             );
@@ -53,6 +63,10 @@ impl UserTextInput {
 impl Component for UserTextInput {
     fn init(&mut self) -> Result<()> {
         Ok(())
+    }
+
+    fn name(&self) -> &str {
+        "User Text Input"
     }
 
     fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
@@ -74,18 +88,39 @@ impl Component for UserTextInput {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::TerminalInput(e) => {
+                if !self.is_focused {
+                    return Ok(None);
+                }
+
+                if let crossterm::event::Event::Key(key) = e {
+                    match key.code {
+                        KeyCode::Enter => {
+                            self.prompt = "No Input Required".into();
+                            return Ok(Some(Action::UserInputValue(
+                                self.txt_input.value_and_reset(),
+                            )));
+                        }
+                        _ => {}
+                    }
+                }
                 let _ = self.txt_input.handle_event(&e);
             }
             Action::UserInputPrompt(v) => self.prompt = v,
-            Action::SendInput => {
-                self.prompt = "No Input Required".into();
-                return Ok(Some(Action::UserInputValue(
-                    self.txt_input.value_and_reset(),
-                )));
-            }
             _ => (),
         }
         Ok(None)
+    }
+
+    fn can_focus(&self) -> bool {
+        true
+    }
+
+    fn focus(&mut self) {
+        self.is_focused = true;
+    }
+
+    fn blur(&mut self) {
+        self.is_focused = false;
     }
 
     fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
