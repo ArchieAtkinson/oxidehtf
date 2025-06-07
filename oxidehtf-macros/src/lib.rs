@@ -49,7 +49,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
             use crate::#mod_name::Fixture;
 
             let context = Fixture::default();
-            htf2::run_tests(
+            oxidehtf::run_tests(
                 vec![#(#test_functions_pointers),*],
                 vec![#(#test_functions_names),*],
                 context)

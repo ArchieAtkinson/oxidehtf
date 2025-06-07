@@ -646,26 +646,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
-name = "htf2"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "cli-log",
- "color-eyre",
- "crossterm",
- "futures",
- "indexmap",
- "indoc",
- "macros",
- "quick-junit",
- "ratatui",
- "thiserror 2.0.12",
- "tokio",
- "tui-input",
-]
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -849,15 +829,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.101",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1001,6 +972,35 @@ name = "owo-colors"
 version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26995317201fa17f3656c36716aed4a7c81743a9634ac4c99c0eeda495db0cec"
+
+[[package]]
+name = "oxidehtf"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "cli-log",
+ "color-eyre",
+ "crossterm",
+ "futures",
+ "indexmap",
+ "indoc",
+ "oxidehtf-macros",
+ "quick-junit",
+ "ratatui",
+ "thiserror 2.0.12",
+ "tokio",
+ "tui-input",
+]
+
+[[package]]
+name = "oxidehtf-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
 
 [[package]]
 name = "parking_lot"

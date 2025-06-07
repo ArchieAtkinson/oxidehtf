@@ -1,5 +1,5 @@
 [package]
-name = "htf2"
+name = "oxidehtf"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,7 +11,7 @@ futures = "0.3.31"
 ratatui = { version = "0.30.0-alpha.2", features = ["all-widgets", "crossterm"] }
 tokio = { version = "1.45.0", features = ["full"] }
 tui-input = "0.12.1"
-macros= { path = "../macros" }
+oxidehtf-macros = { path = "../oxidehtf-macros" }
 async-trait = "0.1.88"
 indoc = "2.0.6"
 indexmap = "2.9.0"

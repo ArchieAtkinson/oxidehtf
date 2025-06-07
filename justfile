@@ -1,8 +1,8 @@
 example name:
-    HTF2_LOG=debug cargo run --package htf2 --example {{ name }}
+    OXIDE_HTF_LOG=debug cargo run --package oxidehtf --example {{ name }}
 
 log:
-    tail -f htf2.log
+    tail -f oxidehtf.log
 
 init:
     cargo install cargo-expand

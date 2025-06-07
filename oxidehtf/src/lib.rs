@@ -24,7 +24,7 @@ macro_rules! assert_eq {
         match (&$left, &$right) {
             (left_val, right_val) => {
                 if !(*left_val == *right_val) {
-                    return Err(htf2::TestFailure::AssertionFailed {
+                    return Err(oxidehtf::TestFailure::AssertionFailed {
                         expected: format!("{:?}", right_val),
                         found: format!("{:?}", left_val),
                         file: file!(),
@@ -35,7 +35,7 @@ macro_rules! assert_eq {
         }
     }};
     ($left:expr, $right:expr) => {{
-        htf2::assert_eq!($left, $right, "");
+        oxidehtf::assert_eq!($left, $right, "");
     }};
 }
 

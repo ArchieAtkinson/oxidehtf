@@ -1,10 +1,10 @@
-#[macros::tests]
+#[oxidehtf_macros::tests]
 mod tests {
     use std::time::Duration;
 
     use cli_log::*;
     use color_eyre::eyre::Result;
-    use htf2::{SysContext, TestLifecycle};
+    use oxidehtf::{SysContext, TestLifecycle};
 
     #[derive(Default)]
     pub struct Fixture {}
@@ -12,14 +12,17 @@ mod tests {
     impl TestLifecycle for Fixture {}
 
     #[test]
-    fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::TestFailure> {
+    fn test1(
+        context: &mut SysContext,
+        _fixture: &mut Fixture,
+    ) -> Result<(), oxidehtf::TestFailure> {
         info!("Running Test1");
 
         let input = context.text_input.request("The answer is 'Test'");
 
         info!("{}", input);
 
-        htf2::assert_eq!(input, "Test");
+        oxidehtf::assert_eq!(input, "Test");
 
         std::thread::sleep(Duration::from_secs(1));
 

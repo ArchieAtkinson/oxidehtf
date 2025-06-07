@@ -2,14 +2,14 @@ use std::time::Duration;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
-use htf2::{SysContext, TestLifecycle};
+use oxidehtf::{SysContext, TestLifecycle};
 
 #[derive(Default)]
 pub struct Fixture {}
 
 impl TestLifecycle for Fixture {}
 
-fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::TestFailure> {
+fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
     info!("Running Test1");
 
     context.dut.set_via_operator(&mut context.text_input);
@@ -18,7 +18,7 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
 
     info!("{}", input);
 
-    htf2::assert_eq!(input, "Test");
+    oxidehtf::assert_eq!(input, "Test");
 
     context
         .measurements
@@ -51,20 +51,20 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::T
 fn test2_with_longer_name(
     context: &mut SysContext,
     _fixture: &mut Fixture,
-) -> Result<(), htf2::TestFailure> {
+) -> Result<(), oxidehtf::TestFailure> {
     info!("Running Test12");
 
     let input = context.text_input.request("The answer is 'Hello'");
 
     info!("{}", input);
 
-    htf2::assert_eq!(input, "Hello");
+    oxidehtf::assert_eq!(input, "Hello");
 
     Ok(())
 }
 
 fn main() -> Result<()> {
-    let (funcs, names) = htf2::register_tests!(test1, test2_with_longer_name);
+    let (funcs, names) = oxidehtf::register_tests!(test1, test2_with_longer_name);
     let context = Fixture::default();
-    htf2::run_tests(funcs, names, context)
+    oxidehtf::run_tests(funcs, names, context)
 }
