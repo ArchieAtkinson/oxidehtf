@@ -95,7 +95,6 @@ OxideHTF provides (or will...):
 └───────────────────────────────────────────────┘└───────────────────────────────────────────────┘
 ```
 
-
 ## Example Tests
 
 ### Without Macro
@@ -105,11 +104,11 @@ pub struct Fixture {}
 
 impl TestLifecycle for Fixture {}
 
-fn test(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::TestFailure> {
+fn test(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
     context.dut.set_via_operator(&mut context.text_input);
 
     let input = context.text_input.request("A example prompt to operator");
-    htf2::assert_eq!(input, "Test");
+    oxidehtf::assert_eq!(input, "Test");
 
     context
         .measurements
@@ -128,9 +127,9 @@ fn test(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::Te
 
 
 fn main() -> Result<()> {
-    let (funcs, names) = htf2::register_tests!(test);
+    let (funcs, names) = oxidehtf::register_tests!(test);
     let context = Fixture::default();
-    htf2::run_tests(funcs, names, context)
+    oxidehtf::run_tests(funcs, names, context)
 }
 
 ```
@@ -139,7 +138,7 @@ fn main() -> Result<()> {
 ```rust
 #[macros::tests]
 mod tests {
-    use htf2::{SysContext, TestLifecycle};
+    use oxidehtf::{SysContext, TestLifecycle};
 
     #[derive(Default)]
     pub struct Fixture {}
@@ -147,11 +146,11 @@ mod tests {
     impl TestLifecycle for Fixture {}
 
     #[test]
-    fn test(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), htf2::TestFailure> {
+    fn test(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
         context.dut.set_via_operator(&mut context.text_input);
 
         let input = context.text_input.request("A example prompt to operator");
-        htf2::assert_eq!(input, "Test");
+        oxidehtf::assert_eq!(input, "Test");
 
         context
             .measurements
@@ -179,4 +178,15 @@ The key differences between OxideHTF and OpenHTF are as follows:
 
 One large benefit of these differences is portability. Having a Rust-based test runner allows for a test binary to be produced and distributed. This, combined with a TUI interface, provides a feature rich UI (one day ..) that can be used on almost any system.   
 
+## Architecture Musings
+
+### Events and Actions/Commands
+
+#### Events
+Events are raw inputs
+Events should be produced by components (and others?) and produce actions
+Events shouldn't change state or take actions
+
+#### Actions
+Actions should be used to change state or do work
 

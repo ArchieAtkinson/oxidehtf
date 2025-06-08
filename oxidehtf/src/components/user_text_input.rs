@@ -1,5 +1,5 @@
 use color_eyre::eyre::Result;
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -7,11 +7,10 @@ use ratatui::{
     Frame,
 };
 use tokio::sync::mpsc;
-use tui_input::backend::crossterm::EventHandler;
 
 use crate::{actions::Action, events::Event, test_runner::test_data::TestData, ui::UiAreas};
 
-use super::Component;
+use super::{text_input_handler::TextInputHandler, Component};
 
 pub struct UserTextInput {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
@@ -80,30 +79,33 @@ impl Component for UserTextInput {
     }
 
     fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+        if !self.is_focused {
+            return Ok(None);
+        }
+
         match event {
-            _ => Ok(None),
+            Event::Key(key)
+                if key.code == KeyCode::Enter && key.modifiers == KeyModifiers::NONE =>
+            {
+                Ok(Some(Action::SendInput))
+            }
+            _ => Ok(TextInputHandler::handle_events(event)),
         }
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::TerminalInput(e) => {
+            Action::InputRequest(e) => {
                 if !self.is_focused {
                     return Ok(None);
                 }
-
-                if let crossterm::event::Event::Key(key) = e {
-                    match key.code {
-                        KeyCode::Enter => {
-                            self.prompt = "No Input Required".into();
-                            return Ok(Some(Action::UserInputValue(
-                                self.txt_input.value_and_reset(),
-                            )));
-                        }
-                        _ => {}
-                    }
-                }
-                let _ = self.txt_input.handle_event(&e);
+                self.txt_input
+                    .handle(e)
+                    .expect("Failed to handle text input");
+            }
+            Action::SendInput => {
+                let input = self.txt_input.value_and_reset();
+                return Ok(Some(Action::UserInputValue(input)));
             }
             Action::UserInputPrompt(v) => self.prompt = v,
             _ => (),

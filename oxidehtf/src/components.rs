@@ -3,8 +3,11 @@ use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub(crate) mod test_status;
-pub(crate) mod user_text_input;
+pub mod current_test;
+pub mod movement_handler;
+pub mod test_status;
+pub mod text_input_handler;
+pub mod user_text_input;
 
 pub trait Component {
     fn init(&mut self) -> Result<()> {

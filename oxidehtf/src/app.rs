@@ -1,11 +1,14 @@
 use cli_log::*;
 use color_eyre::eyre::Result;
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use tokio::sync::mpsc;
 
 use crate::{
     actions::Action,
-    components::{test_status::TestStatusDisplay, user_text_input::UserTextInput, Component},
+    components::{
+        current_test::CurrentTestDisplay, test_status::TestStatusDisplay,
+        user_text_input::UserTextInput, Component,
+    },
     events::Event,
     test_runner::test_data::TestDataManager,
     ui::Ui,
@@ -46,6 +49,7 @@ impl App {
             components: vec![
                 Box::new(UserTextInput::new()),
                 Box::new(TestStatusDisplay::new()),
+                Box::new(CurrentTestDisplay::new()),
             ],
             current_focus: 0,
             state: Default::default(),
@@ -90,26 +94,21 @@ impl App {
             return Ok(());
         };
 
-        match event.clone() {
-            Event::CrosstermEvent(crossterm_event) => {
-                if let crossterm::event::Event::Key(key) = crossterm_event {
-                    match key.code {
-                        KeyCode::Esc => {
-                            self.action_tx.send(Action::ExitApp)?;
-                        }
-                        KeyCode::Tab => {
-                            self.focus_next();
-                        }
-                        _ => {}
-                    }
-                }
-                self.action_tx
-                    .send(Action::TerminalInput(crossterm_event))?;
+        let action = {
+            match event.clone() {
+                Event::Key(key) => match (key.modifiers, key.code) {
+                    (_, KeyCode::Esc) => Some(Action::ExitApp),
+                    (KeyModifiers::NONE, KeyCode::Tab) => Some(Action::FocusNextPane),
+                    (KeyModifiers::SHIFT, KeyCode::BackTab) => Some(Action::FocusPreviousPane),
+                    _ => None,
+                },
+                Event::UserInputPrompt(s) => Some(Action::UserInputPrompt(s)),
+                _ => None,
             }
-            Event::UserInputPrompt(s) => {
-                self.action_tx.send(Action::UserInputPrompt(s))?;
-            }
-            _ => (),
+        };
+
+        if let Some(action) = action {
+            self.action_tx.send(action)?;
         }
 
         for component in self.components.iter_mut() {
@@ -125,9 +124,9 @@ impl App {
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 Action::ExitApp => self.state = AppState::Done,
-                Action::UserInputValue(s) => {
-                    self.input_tx.send(s)?;
-                }
+                Action::FocusNextPane => self.focus_next(),
+                Action::FocusPreviousPane => self.focus_previous(),
+                Action::UserInputValue(s) => self.input_tx.send(s)?,
                 _ => (),
             }
 
@@ -157,6 +156,36 @@ impl App {
 
         for i in 0..len {
             let index = (start_search_index + i) % len;
+            if self.components[index].can_focus() {
+                next_focus_index = index;
+                found_next_focusable = true;
+                break;
+            }
+        }
+
+        if found_next_focusable {
+            self.components[next_focus_index].focus();
+            self.current_focus = next_focus_index;
+        } else {
+            panic!(
+                "No other focusable components found in the sequence. Current focus remains {}.",
+                self.current_focus
+            );
+        }
+    }
+
+    fn focus_previous(&mut self) {
+        self.components[self.current_focus].blur();
+
+        let len = self.components.len();
+
+        let start_search_index = self.current_focus;
+        let mut next_focus_index = 0;
+
+        let mut found_next_focusable = false;
+
+        for i in 0..len {
+            let index = (start_search_index + len - 1 - i) % len;
             if self.components[index].can_focus() {
                 next_focus_index = index;
                 found_next_focusable = true;

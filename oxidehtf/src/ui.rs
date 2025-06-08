@@ -14,6 +14,7 @@ use crate::events::Event;
 pub struct UiAreas {
     pub test_progress: Rect,
     pub operator: Rect,
+    pub current_test: Rect,
     pub test_display: Rect,
 }
 
@@ -43,7 +44,9 @@ impl Ui {
                 break;
             };
 
-            let _ = event_tx.send(Event::CrosstermEvent(event));
+            if let Some(event) = Self::from_crossterm(event) {
+                event_tx.send(event).expect("Event stream empty");
+            }
         }
     }
 
@@ -54,9 +57,10 @@ impl Ui {
         let mut result = Ok(());
         self.terminal.draw(|f| {
             result = {
-                let [test_progress, operator, test_list] = Layout::vertical([
+                let [test_progress, operator, current_test, test_list] = Layout::vertical([
                     Constraint::Length(1),
                     Constraint::Length(3),
+                    Constraint::Length(10),
                     Constraint::Min(1),
                 ])
                 .areas(f.area());
@@ -64,6 +68,7 @@ impl Ui {
                 let areas = UiAreas {
                     test_progress,
                     operator,
+                    current_test,
                     test_display: test_list,
                 };
 
@@ -72,6 +77,16 @@ impl Ui {
         })?;
 
         result
+    }
+
+    fn from_crossterm(crossterm_event: crossterm::event::Event) -> Option<Event> {
+        use crossterm::event::Event as CrosstermEvent;
+        match crossterm_event {
+            CrosstermEvent::Key(key_event) => Some(Event::Key(key_event)),
+            CrosstermEvent::Mouse(mouse_event) => Some(Event::Mouse(mouse_event)),
+            CrosstermEvent::Paste(string) => Some(Event::Paste(string)),
+            _ => None,
+        }
     }
 }
 

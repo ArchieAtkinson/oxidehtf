@@ -1,6 +1,10 @@
+use crossterm::event::{KeyEvent, MouseEvent};
+
 #[derive(Debug, Clone)]
 pub enum Event {
-    CrosstermEvent(crossterm::event::Event),
+    Key(KeyEvent),
+    Mouse(MouseEvent),
+    Paste(String),
     UpdatedTestData,
     TestsCompleted,
     UserInputPrompt(String),
