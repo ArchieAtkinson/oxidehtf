@@ -8,9 +8,12 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 
-use crate::{actions::Action, events::Event, test_runner::test_data::TestData, ui::UiAreas};
+use crate::{
+    actions::Action, event_handlers::text_input_handler::TextInputHandler, events::Event,
+    test_runner::test_data::TestData, ui::UiAreas,
+};
 
-use super::{text_input_handler::TextInputHandler, Component};
+use super::Component;
 
 pub struct UserTextInput {
     action_tx: Option<mpsc::UnboundedSender<Action>>,

@@ -15,7 +15,8 @@ pub struct UiAreas {
     pub test_progress: Rect,
     pub operator: Rect,
     pub current_test: Rect,
-    pub test_display: Rect,
+    pub completed_list: Rect,
+    pub waiting_list: Rect,
 }
 
 pub struct Ui {
@@ -57,7 +58,7 @@ impl Ui {
         let mut result = Ok(());
         self.terminal.draw(|f| {
             result = {
-                let [test_progress, operator, current_test, test_list] = Layout::vertical([
+                let [test_progress, operator, current_test, lists_of_tests] = Layout::vertical([
                     Constraint::Length(1),
                     Constraint::Length(3),
                     Constraint::Length(10),
@@ -65,11 +66,16 @@ impl Ui {
                 ])
                 .areas(f.area());
 
+                let [completed_list, waiting_list] =
+                    Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                        .areas(lists_of_tests);
+
                 let areas = UiAreas {
                     test_progress,
                     operator,
                     current_test,
-                    test_display: test_list,
+                    completed_list,
+                    waiting_list,
                 };
 
                 draw_callback(f, &areas)

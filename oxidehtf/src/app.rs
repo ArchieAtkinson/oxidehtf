@@ -6,8 +6,9 @@ use tokio::sync::mpsc;
 use crate::{
     actions::Action,
     components::{
-        current_test::CurrentTestDisplay, test_status::TestStatusDisplay,
-        user_text_input::UserTextInput, Component,
+        completed_tests::CompletedTestDisplay, current_test::CurrentTestDisplay,
+        suite_progress::SuiteProgressDisplay, user_text_input::UserTextInput,
+        waiting_tests::WaitingTestDisplay, Component,
     },
     events::Event,
     test_runner::test_data::TestDataManager,
@@ -47,8 +48,11 @@ impl App {
             ui: Ui::new(event_tx.clone()),
             test_data,
             components: vec![
+                // User text input first to start as focus
                 Box::new(UserTextInput::new()),
-                Box::new(TestStatusDisplay::new()),
+                Box::new(SuiteProgressDisplay::new()),
+                Box::new(WaitingTestDisplay::new()),
+                Box::new(CompletedTestDisplay::new()),
                 Box::new(CurrentTestDisplay::new()),
             ],
             current_focus: 0,
@@ -94,17 +98,15 @@ impl App {
             return Ok(());
         };
 
-        let action = {
-            match event.clone() {
-                Event::Key(key) => match (key.modifiers, key.code) {
-                    (_, KeyCode::Esc) => Some(Action::ExitApp),
-                    (KeyModifiers::NONE, KeyCode::Tab) => Some(Action::FocusNextPane),
-                    (KeyModifiers::SHIFT, KeyCode::BackTab) => Some(Action::FocusPreviousPane),
-                    _ => None,
-                },
-                Event::UserInputPrompt(s) => Some(Action::UserInputPrompt(s)),
+        let action = match event.clone() {
+            Event::Key(key) => match (key.modifiers, key.code) {
+                (_, KeyCode::Esc) => Some(Action::ExitApp),
+                (KeyModifiers::NONE, KeyCode::Tab) => Some(Action::FocusNextPane),
+                (KeyModifiers::SHIFT, KeyCode::BackTab) => Some(Action::FocusPreviousPane),
                 _ => None,
-            }
+            },
+            Event::UserInputPrompt(s) => Some(Action::UserInputPrompt(s)),
+            _ => None,
         };
 
         if let Some(action) = action {
@@ -121,12 +123,14 @@ impl App {
     }
 
     async fn handle_actions(&mut self) -> Result<()> {
+        use Action::*;
+
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
-                Action::ExitApp => self.state = AppState::Done,
-                Action::FocusNextPane => self.focus_next(),
-                Action::FocusPreviousPane => self.focus_previous(),
-                Action::UserInputValue(s) => self.input_tx.send(s)?,
+                ExitApp => self.state = AppState::Done,
+                FocusNextPane => self.focus_next(),
+                FocusPreviousPane => self.focus_previous(),
+                UserInputValue(s) => self.input_tx.send(s)?,
                 _ => (),
             }
 

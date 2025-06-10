@@ -12,12 +12,13 @@ use tokio::sync::mpsc;
 
 use crate::{
     actions::Action,
+    event_handlers::movement_handler::MovementHandler,
     events::Event,
     test_runner::test_data::{TestData, TestState},
     ui::UiAreas,
 };
 
-use super::{movement_handler::MovementHandler, Component};
+use super::Component;
 
 enum Scroll {
     Up,

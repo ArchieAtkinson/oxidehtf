@@ -1,6 +1,7 @@
 pub(crate) mod actions;
 pub(crate) mod app;
 pub(crate) mod components;
+pub(crate) mod event_handlers;
 pub(crate) mod events;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
