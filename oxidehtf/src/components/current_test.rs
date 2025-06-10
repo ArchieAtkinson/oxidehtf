@@ -1,7 +1,8 @@
 // use cli_log::info;
 // use cli_log::*;
 use color_eyre::Result;
-use ratatui::widgets::Block;
+use ratatui::layout::Margin;
+use ratatui::widgets::{Block, Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Style, Stylize},
@@ -29,6 +30,7 @@ pub struct CurrentTestDisplay {
     action_tx: Option<mpsc::UnboundedSender<Action>>,
     event_tx: Option<mpsc::UnboundedSender<Event>>,
     table_state: TableState,
+    scrollbar_state: ScrollbarState,
     is_focused: bool,
     current_rows_seen: usize,
     total_measurements: usize,
@@ -43,6 +45,7 @@ impl CurrentTestDisplay {
             is_focused: false,
             current_rows_seen: 0,
             total_measurements: 0,
+            scrollbar_state: ScrollbarState::new(0),
         }
     }
 
@@ -50,8 +53,15 @@ impl CurrentTestDisplay {
         let offset = self.table_state.offset_mut();
 
         *offset = match direction {
-            Scroll::Down => offset.saturating_add(1),
-            Scroll::Up => offset.saturating_sub(1),
+            Scroll::Down => {
+                self.scrollbar_state.next();
+
+                offset.saturating_add(1)
+            }
+            Scroll::Up => {
+                self.scrollbar_state.prev();
+                offset.saturating_sub(1)
+            }
         };
 
         let max_offset = self.total_measurements - self.current_rows_seen;
@@ -134,6 +144,26 @@ impl CurrentTestDisplay {
 
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
+
+    fn render_scrollbar(&mut self, frame: &mut Frame, area: Rect) {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓"));
+
+        self.scrollbar_state = self
+            .scrollbar_state
+            .content_length(self.total_measurements)
+            .viewport_content_length(self.current_rows_seen);
+
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut self.scrollbar_state,
+        )
+    }
 }
 
 impl Component for CurrentTestDisplay {
@@ -187,6 +217,7 @@ impl Component for CurrentTestDisplay {
     fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
         let area = area.current_test;
         self.render_current_test(frame, area, data);
+        self.render_scrollbar(frame, area);
         Ok(())
     }
 }
