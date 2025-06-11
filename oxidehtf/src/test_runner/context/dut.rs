@@ -1,4 +1,4 @@
-use crate::test_runner::SuiteData;
+use crate::test_data::SuiteData;
 
 use super::user_text_input::TextInput;
 

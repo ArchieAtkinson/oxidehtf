@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     actions::Action, event_handlers::text_input_handler::TextInputHandler, events::Event,
-    test_runner::test_data::SuiteDataRaw, ui::UiAreas,
+    test_data::SuiteDataRaw, ui::UiAreas,
 };
 
 use super::Component;

@@ -6,15 +6,14 @@ use context::SysContext;
 use errors::TestFailure;
 use lifecycle::TestLifecycle;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use test_data::{SuiteData, TestDone, TestRunning, TestState};
 use tokio::sync::mpsc;
 
 use crate::events::Event;
+use crate::test_data::{SuiteData, TestDone, TestRunning, TestState};
 
 pub mod context;
 pub mod errors;
 pub mod lifecycle;
-pub mod test_data;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 

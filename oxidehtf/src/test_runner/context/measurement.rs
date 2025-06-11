@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{test_runner::test_data::CurrentTestData, TestFailure};
+use crate::{test_data::CurrentTestData, TestFailure};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {

@@ -11,7 +11,7 @@ use crate::{
         waiting_tests::WaitingTestDisplay, Component,
     },
     events::Event,
-    test_runner::test_data::SuiteData,
+    test_data::SuiteData,
     ui::Ui,
 };
 

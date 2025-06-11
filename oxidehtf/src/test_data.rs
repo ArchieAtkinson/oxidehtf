@@ -6,8 +6,7 @@ use indexmap::IndexMap;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::events::Event;
-
-use super::context::measurement::MeasurementDefinition;
+use crate::test_runner::context::measurement::MeasurementDefinition;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub enum TestState {

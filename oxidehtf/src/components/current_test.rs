@@ -15,7 +15,7 @@ use crate::{
     actions::Action,
     event_handlers::movement_handler::MovementHandler,
     events::Event,
-    test_runner::test_data::{SuiteDataRaw, TestState},
+    test_data::{SuiteDataRaw, TestState},
     ui::UiAreas,
 };
 

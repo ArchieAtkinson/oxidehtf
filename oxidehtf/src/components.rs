@@ -1,4 +1,4 @@
-use crate::{actions::Action, events::Event, test_runner::test_data::SuiteDataRaw, ui::UiAreas};
+use crate::{actions::Action, events::Event, test_data::SuiteDataRaw, ui::UiAreas};
 use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;

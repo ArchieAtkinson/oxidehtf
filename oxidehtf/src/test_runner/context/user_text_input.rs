@@ -2,7 +2,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     events::Event,
-    test_runner::test_data::{CurrentTestData, TestRunning, TestState},
+    test_data::{CurrentTestData, TestRunning, TestState},
 };
 
 pub struct TextInput {

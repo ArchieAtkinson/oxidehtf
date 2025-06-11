@@ -3,12 +3,13 @@ pub(crate) mod app;
 pub(crate) mod components;
 pub(crate) mod event_handlers;
 pub(crate) mod events;
+pub(crate) mod test_data;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
-use test_runner::test_data::SuiteData;
+use test_data::SuiteData;
 use test_runner::{
     context::{dut::Dut, measurement::Measurements, user_text_input::TextInput},
     FuncType, TestFunctions, TestRunner,

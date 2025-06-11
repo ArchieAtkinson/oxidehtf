@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::test_runner::test_data::{SuiteDataRaw, TestState};
+use crate::test_data::{SuiteDataRaw, TestState};
 use crate::ui::UiAreas;
 
 use super::Component;

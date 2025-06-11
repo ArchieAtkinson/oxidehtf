@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    test_runner::test_data::{SuiteDataRaw, TestState},
+    test_data::{SuiteDataRaw, TestState},
     ui::UiAreas,
 };
 
