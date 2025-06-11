@@ -1,5 +1,5 @@
 use cli_log::*;
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{OptionExt, Result};
 use crossterm::event::{KeyCode, KeyModifiers};
 use tokio::sync::mpsc;
 
@@ -12,7 +12,9 @@ use crate::{
     },
     events::Event,
     test_data::SuiteData,
+    test_runner::{FuncType, TestFunctions, TestRunner},
     ui::Ui,
+    SysContext, TestLifecycle,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -22,11 +24,12 @@ pub enum AppState {
     Done,
 }
 
-pub struct App {
+pub struct App<T: TestLifecycle> {
     ui: Ui,
     state: AppState,
     suite_data: SuiteData,
     components: Vec<Box<dyn Component>>,
+    test_runner: Option<TestRunner<T>>,
     current_focus: usize,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -35,14 +38,23 @@ pub struct App {
     input_tx: mpsc::UnboundedSender<String>,
 }
 
-impl App {
-    pub fn new(
-        suite_data: SuiteData,
-        event_rx: mpsc::UnboundedReceiver<Event>,
-        event_tx: mpsc::UnboundedSender<Event>,
-        input_tx: mpsc::UnboundedSender<String>,
-    ) -> Result<Self> {
+impl<T: TestLifecycle + Send + 'static> App<T> {
+    pub fn new(funcs: Vec<FuncType<T>>, names: Vec<&'static str>, fixture: T) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let (input_tx, input_rx) = mpsc::unbounded_channel();
+
+        let test_funcs = TestFunctions { funcs };
+        let suite_data = SuiteData::new(names, event_tx.clone());
+
+        let context = SysContext::new(suite_data.clone(), event_tx.clone(), input_rx);
+        let test_runner = TestRunner::new(
+            test_funcs,
+            suite_data.clone(),
+            event_tx.clone(),
+            context,
+            fixture,
+        );
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
@@ -55,6 +67,7 @@ impl App {
                 Box::new(CompletedTestDisplay::new()),
                 Box::new(CurrentTestDisplay::new()),
             ],
+            test_runner: Some(test_runner),
             current_focus: 0,
             state: Default::default(),
             action_rx,
@@ -66,6 +79,10 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        let mut test_runner = self.test_runner.take().ok_or_eyre("No Test Runner")?;
+        let mut runner_handle = tokio::task::spawn_blocking(move || test_runner.run());
+        let mut is_runner_done = false;
+
         for component in self.components.iter_mut() {
             component.register_event_handler(self.event_tx.clone())?;
             component.register_action_handler(self.action_tx.clone())?;
@@ -88,6 +105,20 @@ impl App {
                 }
                 Ok(())
             })?;
+
+            if !is_runner_done {
+                tokio::select! {
+                    result = (&mut runner_handle) => {
+                        is_runner_done = true;
+                        match result {
+                            Ok(_) =>  info!("Runner handle completed successfully!"),
+                            Err(e) => info!("Runner handle failed: {:?}", e),
+                        }
+                    },
+                    _ = tokio::time::sleep(tokio::time::Duration::from_nanos(1)) => {
+                    }
+                }
+            }
         }
 
         Ok(())

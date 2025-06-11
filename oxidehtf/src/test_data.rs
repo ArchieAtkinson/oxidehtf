@@ -32,8 +32,8 @@ pub enum TestDone {
 
 #[derive(Debug, Clone)]
 pub struct SuiteData {
-    pub inner: Arc<RwLock<SuiteDataRaw>>,
-    pub event_tx: mpsc::UnboundedSender<Event>,
+    inner: Arc<RwLock<SuiteDataRaw>>,
+    event_tx: mpsc::UnboundedSender<Event>,
     current_test: CurrentTestData,
 }
 
