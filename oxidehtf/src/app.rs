@@ -25,7 +25,7 @@ pub enum AppState {
 pub struct App {
     ui: Ui,
     state: AppState,
-    test_data: SuiteData,
+    suite_data: SuiteData,
     components: Vec<Box<dyn Component>>,
     current_focus: usize,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -37,7 +37,7 @@ pub struct App {
 
 impl App {
     pub fn new(
-        test_data: SuiteData,
+        suite_data: SuiteData,
         event_rx: mpsc::UnboundedReceiver<Event>,
         event_tx: mpsc::UnboundedSender<Event>,
         input_tx: mpsc::UnboundedSender<String>,
@@ -46,7 +46,7 @@ impl App {
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
-            test_data,
+            suite_data,
             components: vec![
                 // User text input first to start as focus
                 Box::new(UserTextInput::new()),
@@ -81,7 +81,7 @@ impl App {
         while self.state() != AppState::Done {
             self.handle_event().await?;
             self.handle_actions().await?;
-            let state = self.test_data.get_copy().await;
+            let state = self.suite_data.get_raw_copy().await;
             self.ui.render(|f, a| {
                 for component in self.components.iter_mut() {
                     component.draw(f, &a, &state)?;

@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    test_runner::test_data::{SuiteDataInner, TestState},
+    test_runner::test_data::{SuiteDataRaw, TestState},
     ui::UiAreas,
 };
 
@@ -22,7 +22,7 @@ impl WaitingTestDisplay {
         Self {}
     }
 
-    fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &SuiteDataInner) {
+    fn render_waiting_tests(&self, frame: &mut Frame, area: Rect, data: &SuiteDataRaw) {
         let waiting_tests: Vec<Line> = data
             .test_metadata
             .iter()
@@ -50,7 +50,7 @@ impl Component for WaitingTestDisplay {
         "Test Status Display"
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataInner) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataRaw) -> Result<()> {
         self.render_waiting_tests(frame, area.waiting_list, data);
         Ok(())
     }

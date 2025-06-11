@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     actions::Action, event_handlers::text_input_handler::TextInputHandler, events::Event,
-    test_runner::test_data::SuiteDataInner, ui::UiAreas,
+    test_runner::test_data::SuiteDataRaw, ui::UiAreas,
 };
 
 use super::Component;
@@ -34,7 +34,7 @@ impl UserTextInput {
         }
     }
 
-    fn draw_input(&mut self, frame: &mut Frame, area: Rect, _data: &SuiteDataInner) -> Result<()> {
+    fn draw_input(&mut self, frame: &mut Frame, area: Rect, _data: &SuiteDataRaw) -> Result<()> {
         let border_style = if self.is_focused {
             Style::default().yellow()
         } else {
@@ -128,7 +128,7 @@ impl Component for UserTextInput {
         self.is_focused = false;
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataInner) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataRaw) -> Result<()> {
         assert_eq!(area.operator.height, 3);
         self.draw_input(frame, area.operator, data)?;
 

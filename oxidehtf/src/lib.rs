@@ -10,7 +10,7 @@ use cli_log::*;
 use color_eyre::eyre::Result;
 use test_runner::test_data::SuiteData;
 use test_runner::{
-    context::{dut::DUT, measurement::Measurements, user_text_input::TextInput},
+    context::{dut::Dut, measurement::Measurements, user_text_input::TextInput},
     FuncType, TestFunctions, TestRunner,
 };
 use tokio::{runtime::Runtime, sync::mpsc};
@@ -64,11 +64,11 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
 
         let test_funcs = TestFunctions { funcs };
         let suite_data = SuiteData::new(names, event_tx.clone());
-
+        let current_test = suite_data.current_test_ref();
         let context = SysContext {
-            text_input: TextInput::new(event_tx.clone(), input_rx, suite_data.clone()),
-            measurements: Measurements::new(suite_data.clone()),
-            dut: DUT::new(suite_data.clone()),
+            text_input: TextInput::new(event_tx.clone(), input_rx, current_test.clone()),
+            measurements: Measurements::new(current_test.clone()),
+            dut: Dut::new(suite_data.clone()),
         };
 
         let mut test_runner = TestRunner::new(

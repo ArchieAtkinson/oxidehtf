@@ -33,9 +33,17 @@ pub enum TestDone {
 
 #[derive(Debug, Clone)]
 pub struct SuiteData {
-    pub inner: Arc<RwLock<SuiteDataInner>>,
+    pub inner: Arc<RwLock<SuiteDataRaw>>,
     pub event_tx: mpsc::UnboundedSender<Event>,
     current_test: CurrentTestData,
+}
+
+#[derive(Debug, Clone)]
+pub struct SuiteDataRaw {
+    pub start_time: DateTime<FixedOffset>,
+    pub dut_id: String,
+    pub test_metadata: Vec<TestData>,
+    pub current_index: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -47,26 +55,18 @@ pub struct TestData {
 }
 
 #[derive(Debug, Clone)]
-pub struct SuiteDataInner {
-    pub start_time: DateTime<FixedOffset>,
-    pub dut_id: String,
-    pub test_metadata: Vec<TestData>,
-    pub current_index: usize,
-}
-
-#[derive(Debug, Clone)]
 pub struct CurrentTestData {
-    inner: Arc<RwLock<SuiteDataInner>>,
+    inner: Arc<RwLock<SuiteDataRaw>>,
     event_tx: mpsc::UnboundedSender<Event>,
 }
 
-pub fn blocking_write<F, R>(
-    inner: &Arc<RwLock<SuiteDataInner>>,
+fn blocking_write<F, R>(
+    inner: &Arc<RwLock<SuiteDataRaw>>,
     tx: &mpsc::UnboundedSender<Event>,
     f: F,
 ) -> Result<R>
 where
-    F: FnOnce(&mut SuiteDataInner) -> Result<R>,
+    F: FnOnce(&mut SuiteDataRaw) -> Result<R>,
 {
     let mut data_guard = inner.blocking_write();
     let result = f(&mut data_guard);
@@ -75,9 +75,9 @@ where
     result
 }
 
-pub fn blocking_read<F, R>(inner: &Arc<RwLock<SuiteDataInner>>, f: F) -> Result<R>
+fn blocking_read<F, R>(inner: &Arc<RwLock<SuiteDataRaw>>, f: F) -> Result<R>
 where
-    F: FnOnce(&SuiteDataInner) -> Result<R>,
+    F: FnOnce(&SuiteDataRaw) -> Result<R>,
 {
     let mut data_guard = inner.blocking_read();
     let result = f(&mut data_guard);
@@ -86,7 +86,7 @@ where
 }
 
 impl CurrentTestData {
-    fn new(inner: Arc<RwLock<SuiteDataInner>>, event_tx: mpsc::UnboundedSender<Event>) -> Self {
+    fn new(inner: Arc<RwLock<SuiteDataRaw>>, event_tx: mpsc::UnboundedSender<Event>) -> Self {
         Self { inner, event_tx }
     }
 
@@ -110,15 +110,24 @@ impl CurrentTestData {
             Ok(())
         })
     }
+
+    pub fn insert_measurement(&self, name: &str, def: MeasurementDefinition) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_test_mut()
+                .user_data
+                .insert(name.into(), def.clone());
+            Ok(())
+        })
+    }
 }
 
-pub struct CurrentTestMetadataIterator<'a> {
+pub struct CurrentTestDataIterator<'a> {
     current_test: &'a CurrentTestData,
     current_index: Cell<usize>,
     number_of_tests: usize,
 }
 
-impl<'a> Iterator for &'a CurrentTestMetadataIterator<'a> {
+impl<'a> Iterator for &'a CurrentTestDataIterator<'a> {
     type Item = &'a CurrentTestData;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -135,7 +144,7 @@ impl<'a> Iterator for &'a CurrentTestMetadataIterator<'a> {
 
 impl SuiteData {
     pub fn new(names: Vec<&'static str>, event_tx: mpsc::UnboundedSender<Event>) -> Self {
-        let test_data = SuiteDataInner {
+        let test_data = SuiteDataRaw {
             test_metadata: names
                 .iter()
                 .map(|n| TestData {
@@ -159,16 +168,20 @@ impl SuiteData {
         }
     }
 
-    pub fn current_test_metadata_iter(&self) -> CurrentTestMetadataIterator {
-        CurrentTestMetadataIterator {
+    pub fn current_testdata_iter(&self) -> CurrentTestDataIterator {
+        CurrentTestDataIterator {
             current_test: &self.current_test,
             current_index: Cell::new(0),
             number_of_tests: self.number_of_tests().unwrap(),
         }
     }
 
-    pub fn get_current_test(&self) -> &CurrentTestData {
+    pub fn current_test_ref(&self) -> &CurrentTestData {
         &self.current_test
+    }
+
+    pub fn current_test_copy(&self) -> CurrentTestData {
+        self.current_test.clone()
     }
 
     pub fn set_suite_start_time(&self) -> Result<()> {
@@ -183,37 +196,24 @@ impl SuiteData {
         blocking_read(&self.inner, |d| Ok(d.test_metadata.len()))
     }
 
-    pub fn set_current_test_index(&self, index: usize) -> Result<()> {
+    pub fn set_dut_id(&self, id: impl Into<String>) {
         blocking_write(&self.inner, &self.event_tx, |d| {
-            d.current_index = index;
+            d.dut_id = id.into();
             Ok(())
         })
+        .unwrap();
     }
 
-    pub fn set_current_test_state(&self, state: TestState) -> Result<()> {
-        blocking_write(&self.inner, &self.event_tx, |d| {
-            d.current_test_mut().state = state;
-            Ok(())
-        })
-    }
-
-    pub fn set_current_test_duration(&self, duration: Duration) -> Result<()> {
-        blocking_write(&self.inner, &self.event_tx, |d| {
-            d.current_test_mut().duration = duration;
-            Ok(())
-        })
-    }
-
-    pub fn blocking_get_copy(&self) -> SuiteDataInner {
+    pub fn blocking_get_raw_copy(&self) -> SuiteDataRaw {
         self.inner.blocking_read().clone()
     }
 
-    pub async fn get_copy(&self) -> SuiteDataInner {
+    pub async fn get_raw_copy(&self) -> SuiteDataRaw {
         self.inner.read().await.clone()
     }
 }
 
-impl SuiteDataInner {
+impl SuiteDataRaw {
     pub fn current_test(&self) -> &TestData {
         let current_index = self.current_index;
         self.test_metadata

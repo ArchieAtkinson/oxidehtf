@@ -58,9 +58,9 @@ impl<T: TestLifecycle> TestRunner<T> {
             .funcs
             .funcs
             .iter()
-            .zip(&self.data.current_test_metadata_iter())
+            .zip(&self.data.current_testdata_iter())
         {
-            data.set_state(TestState::Running(TestRunning::Running));
+            data.set_state(TestState::Running(TestRunning::Running))?;
 
             self.fixture.before_test()?;
 
@@ -76,7 +76,7 @@ impl<T: TestLifecycle> TestRunner<T> {
             };
 
             data.set_state(final_state)?;
-            self.data.set_current_test_duration(test_duration)?;
+            data.set_test_duration(test_duration)?;
         }
 
         self.event_tx.send(Event::TestsCompleted)?;
@@ -94,7 +94,7 @@ impl<T: TestLifecycle> TestRunner<T> {
         let mut report = Report::new("htf2-run");
         let mut test_suite = TestSuite::new("htf2-suite");
 
-        let data = self.data.blocking_get_copy();
+        let data = self.data.blocking_get_raw_copy();
 
         for test in data.test_metadata {
             let test_case_result = match test.state {

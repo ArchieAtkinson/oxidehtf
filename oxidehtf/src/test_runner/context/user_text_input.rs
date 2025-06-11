@@ -2,25 +2,25 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     events::Event,
-    test_runner::test_data::{blocking_write, SuiteData, TestRunning, TestState},
+    test_runner::test_data::{CurrentTestData, TestRunning, TestState},
 };
 
 pub struct TextInput {
     event_tx: UnboundedSender<Event>,
     input_rx: UnboundedReceiver<String>,
-    test_data: SuiteData,
+    current_test: CurrentTestData,
 }
 
 impl TextInput {
     pub fn new(
         event_tx: UnboundedSender<Event>,
         input_rx: UnboundedReceiver<String>,
-        test_data: SuiteData,
+        current_test: CurrentTestData,
     ) -> Self {
         Self {
             event_tx,
             input_rx,
-            test_data,
+            current_test,
         }
     }
 
@@ -31,19 +31,15 @@ impl TextInput {
             .send(Event::UserInputPrompt(prompt.into()))
             .expect("Failed to send user Prompt");
 
-        blocking_write(&self.test_data.inner, &self.test_data.event_tx, |d| {
-            d.current_test_mut().state = TestState::Running(TestRunning::WaitingForInput);
-            Ok(())
-        })
-        .unwrap();
+        self.current_test
+            .set_state(TestState::Running(TestRunning::WaitingForInput))
+            .unwrap();
 
         let input = self.input_rx.blocking_recv().expect("No Input");
 
-        blocking_write(&self.test_data.inner, &self.test_data.event_tx, |d| {
-            d.current_test_mut().state = TestState::Running(TestRunning::Running);
-            Ok(())
-        })
-        .unwrap();
+        self.current_test
+            .set_state(TestState::Running(TestRunning::Running))
+            .unwrap();
 
         input
     }

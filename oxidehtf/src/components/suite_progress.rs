@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::test_runner::test_data::{SuiteDataInner, TestState};
+use crate::test_runner::test_data::{SuiteDataRaw, TestState};
 use crate::ui::UiAreas;
 
 use super::Component;
@@ -19,7 +19,7 @@ impl SuiteProgressDisplay {
         Self {}
     }
 
-    fn render_progress(&self, frame: &mut Frame, area: Rect, data: &SuiteDataInner) {
+    fn render_progress(&self, frame: &mut Frame, area: Rect, data: &SuiteDataRaw) {
         let tests_finished = data
             .test_metadata
             .iter()
@@ -55,7 +55,7 @@ impl Component for SuiteProgressDisplay {
         "Test Suite Progress Display"
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataInner) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataRaw) -> Result<()> {
         assert_eq!(area.test_progress.height, 1);
         self.render_progress(frame, area.test_progress, data);
         Ok(())

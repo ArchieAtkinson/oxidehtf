@@ -1,4 +1,4 @@
-use crate::{actions::Action, events::Event, test_runner::test_data::SuiteDataInner, ui::UiAreas};
+use crate::{actions::Action, events::Event, test_runner::test_data::SuiteDataRaw, ui::UiAreas};
 use color_eyre::Result;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
@@ -48,5 +48,5 @@ pub trait Component {
         ()
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &SuiteDataInner) -> Result<()>;
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &SuiteDataRaw) -> Result<()>;
 }
