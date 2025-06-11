@@ -11,7 +11,7 @@ use crate::{
         waiting_tests::WaitingTestDisplay, Component,
     },
     events::Event,
-    test_runner::test_data::TestDataManager,
+    test_runner::test_data::SuiteData,
     ui::Ui,
 };
 
@@ -25,7 +25,7 @@ pub enum AppState {
 pub struct App {
     ui: Ui,
     state: AppState,
-    test_data: TestDataManager,
+    test_data: SuiteData,
     components: Vec<Box<dyn Component>>,
     current_focus: usize,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -37,7 +37,7 @@ pub struct App {
 
 impl App {
     pub fn new(
-        test_data: TestDataManager,
+        test_data: SuiteData,
         event_rx: mpsc::UnboundedReceiver<Event>,
         event_tx: mpsc::UnboundedSender<Event>,
         input_tx: mpsc::UnboundedSender<String>,

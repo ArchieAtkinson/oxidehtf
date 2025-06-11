@@ -1,10 +1,6 @@
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-    time::Duration,
-};
+use std::{cell::Cell, sync::Arc, time::Duration};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use color_eyre::Result;
 use indexmap::IndexMap;
 use tokio::sync::{mpsc, RwLock};
@@ -36,17 +32,113 @@ pub enum TestDone {
 }
 
 #[derive(Debug, Clone)]
-pub struct TestDataManager {
-    inner: Arc<RwLock<TestData>>,
+pub struct SuiteData {
+    pub inner: Arc<RwLock<SuiteDataInner>>,
+    pub event_tx: mpsc::UnboundedSender<Event>,
+    current_test: CurrentTestData,
+}
+
+#[derive(Debug, Clone)]
+pub struct TestData {
+    pub name: &'static str,
+    pub duration: Duration,
+    pub state: TestState,
+    pub user_data: IndexMap<String, MeasurementDefinition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SuiteDataInner {
+    pub start_time: DateTime<FixedOffset>,
+    pub dut_id: String,
+    pub test_metadata: Vec<TestData>,
+    pub current_index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CurrentTestData {
+    inner: Arc<RwLock<SuiteDataInner>>,
     event_tx: mpsc::UnboundedSender<Event>,
 }
 
-impl TestDataManager {
+pub fn blocking_write<F, R>(
+    inner: &Arc<RwLock<SuiteDataInner>>,
+    tx: &mpsc::UnboundedSender<Event>,
+    f: F,
+) -> Result<R>
+where
+    F: FnOnce(&mut SuiteDataInner) -> Result<R>,
+{
+    let mut data_guard = inner.blocking_write();
+    let result = f(&mut data_guard);
+    drop(data_guard);
+    tx.send(Event::UpdatedTestData)?;
+    result
+}
+
+pub fn blocking_read<F, R>(inner: &Arc<RwLock<SuiteDataInner>>, f: F) -> Result<R>
+where
+    F: FnOnce(&SuiteDataInner) -> Result<R>,
+{
+    let mut data_guard = inner.blocking_read();
+    let result = f(&mut data_guard);
+    drop(data_guard);
+    result
+}
+
+impl CurrentTestData {
+    fn new(inner: Arc<RwLock<SuiteDataInner>>, event_tx: mpsc::UnboundedSender<Event>) -> Self {
+        Self { inner, event_tx }
+    }
+
+    fn update_test_index(&self, index: usize) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_index = index;
+            Ok(())
+        })
+    }
+
+    pub fn set_state(&self, state: TestState) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_test_mut().state = state;
+            Ok(())
+        })
+    }
+
+    pub fn set_test_duration(&self, duration: Duration) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_test_mut().duration = duration;
+            Ok(())
+        })
+    }
+}
+
+pub struct CurrentTestMetadataIterator<'a> {
+    current_test: &'a CurrentTestData,
+    current_index: Cell<usize>,
+    number_of_tests: usize,
+}
+
+impl<'a> Iterator for &'a CurrentTestMetadataIterator<'a> {
+    type Item = &'a CurrentTestData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.current_index.get();
+
+        if index > self.number_of_tests {
+            return None;
+        }
+        self.current_test.update_test_index(index).ok()?;
+        self.current_index.replace(index + 1);
+        Some(self.current_test)
+    }
+}
+
+impl SuiteData {
     pub fn new(names: Vec<&'static str>, event_tx: mpsc::UnboundedSender<Event>) -> Self {
-        let test_data = TestData {
+        let test_data = SuiteDataInner {
             test_metadata: names
                 .iter()
-                .map(|n| TestMetadata {
+                .map(|n| TestData {
                     name: *n,
                     state: TestState::InQueue,
                     user_data: IndexMap::new(),
@@ -58,84 +150,81 @@ impl TestDataManager {
             start_time: Default::default(),
         };
 
+        let inner = Arc::new(RwLock::new(test_data));
+
         Self {
-            inner: Arc::new(RwLock::new(test_data)),
-            event_tx,
+            inner: inner.clone(),
+            event_tx: event_tx.clone(),
+            current_test: CurrentTestData::new(inner.clone(), event_tx.clone()),
         }
     }
 
-    pub fn blocking_write<F, R>(&self, f: F) -> Result<R>
-    where
-        F: FnOnce(&mut TestData) -> Result<R>,
-    {
-        let mut data_guard = self.inner.blocking_write();
-        let result = f(&mut data_guard);
-        drop(data_guard);
-        self.event_tx.send(Event::UpdatedTestData)?;
-        result
+    pub fn current_test_metadata_iter(&self) -> CurrentTestMetadataIterator {
+        CurrentTestMetadataIterator {
+            current_test: &self.current_test,
+            current_index: Cell::new(0),
+            number_of_tests: self.number_of_tests().unwrap(),
+        }
     }
 
-    pub fn blocking_read<F, R>(&mut self, f: F) -> Result<R>
-    where
-        F: FnOnce(&TestData) -> Result<R>,
-    {
-        let mut data_guard = self.inner.blocking_read();
-        let result = f(&mut data_guard);
-        drop(data_guard);
-        result
+    pub fn get_current_test(&self) -> &CurrentTestData {
+        &self.current_test
     }
 
-    pub fn blocking_get_copy(&self) -> TestData {
+    pub fn set_suite_start_time(&self) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            let fixed_offset = FixedOffset::west_opt(0).unwrap();
+            d.start_time = Utc::now().with_timezone(&fixed_offset);
+            Ok(())
+        })
+    }
+
+    pub fn number_of_tests(&self) -> Result<usize> {
+        blocking_read(&self.inner, |d| Ok(d.test_metadata.len()))
+    }
+
+    pub fn set_current_test_index(&self, index: usize) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_index = index;
+            Ok(())
+        })
+    }
+
+    pub fn set_current_test_state(&self, state: TestState) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_test_mut().state = state;
+            Ok(())
+        })
+    }
+
+    pub fn set_current_test_duration(&self, duration: Duration) -> Result<()> {
+        blocking_write(&self.inner, &self.event_tx, |d| {
+            d.current_test_mut().duration = duration;
+            Ok(())
+        })
+    }
+
+    pub fn blocking_get_copy(&self) -> SuiteDataInner {
         self.inner.blocking_read().clone()
     }
 
-    pub async fn get_copy(&self) -> TestData {
+    pub async fn get_copy(&self) -> SuiteDataInner {
         self.inner.read().await.clone()
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TestMetadata {
-    pub name: &'static str,
-    pub duration: Duration,
-    pub state: TestState,
-    pub user_data: IndexMap<String, MeasurementDefinition>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TestData {
-    pub start_time: DateTime<FixedOffset>,
-    pub dut_id: String,
-    pub test_metadata: Vec<TestMetadata>,
-    pub current_index: usize,
-}
-
-impl TestData {
-    pub fn current_test(&self) -> &TestMetadata {
+impl SuiteDataInner {
+    pub fn current_test(&self) -> &TestData {
         let current_index = self.current_index;
         self.test_metadata
             .get(current_index)
             .expect("current_index should always be a valid index for test_metadata")
     }
 
-    pub fn current_test_mut(&mut self) -> &mut TestMetadata {
+    pub fn current_test_mut(&mut self) -> &mut TestData {
         let current_index = self.current_index;
         self.test_metadata
             .get_mut(current_index)
             .expect("current_index should always be a valid index for test_metadata")
-    }
-}
-
-impl Deref for TestData {
-    type Target = Vec<TestMetadata>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.test_metadata
-    }
-}
-
-impl DerefMut for TestData {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.test_metadata
     }
 }

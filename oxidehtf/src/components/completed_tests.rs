@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    test_runner::test_data::{TestData, TestState},
+    test_runner::test_data::{SuiteDataInner, TestState},
     ui::UiAreas,
 };
 
@@ -22,8 +22,9 @@ impl CompletedTestDisplay {
         Self {}
     }
 
-    fn render_completed_tests(&self, frame: &mut Frame, area: Rect, data: &TestData) {
+    fn render_completed_tests(&self, frame: &mut Frame, area: Rect, data: &SuiteDataInner) {
         let completed_tests = data
+            .test_metadata
             .iter()
             .filter(|test| match test.state {
                 TestState::Done(_) => true,
@@ -47,7 +48,7 @@ impl Component for CompletedTestDisplay {
         "Test Status Display"
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataInner) -> Result<()> {
         self.render_completed_tests(frame, area.completed_list, data);
         Ok(())
     }

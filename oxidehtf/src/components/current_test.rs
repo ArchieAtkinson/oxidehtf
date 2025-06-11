@@ -15,7 +15,7 @@ use crate::{
     actions::Action,
     event_handlers::movement_handler::MovementHandler,
     events::Event,
-    test_runner::test_data::{TestData, TestState},
+    test_runner::test_data::{SuiteDataInner, TestState},
     ui::UiAreas,
 };
 
@@ -68,8 +68,8 @@ impl CurrentTestDisplay {
         *offset = (*offset).clamp(0 as usize, max_offset);
     }
 
-    fn render_current_test(&mut self, frame: &mut Frame, area: Rect, data: &TestData) {
-        let current_test = data.iter().find(|t| match t.state {
+    fn render_current_test(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataInner) {
+        let current_test = data.test_metadata.iter().find(|t| match t.state {
             TestState::Running(_) => true,
             _ => false,
         });
@@ -214,7 +214,7 @@ impl Component for CurrentTestDisplay {
         self.is_focused = false;
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &TestData) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataInner) -> Result<()> {
         let area = area.current_test;
         self.render_current_test(frame, area, data);
         self.render_scrollbar(frame, area);

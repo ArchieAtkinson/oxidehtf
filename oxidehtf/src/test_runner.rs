@@ -1,13 +1,12 @@
 use std::time::Instant;
 
-use chrono::{FixedOffset, Utc};
 use cli_log::*;
 use color_eyre::Result;
 use context::SysContext;
 use errors::TestFailure;
 use lifecycle::TestLifecycle;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use test_data::{TestDataManager, TestDone, TestRunning, TestState};
+use test_data::{SuiteData, TestDone, TestRunning, TestState};
 use tokio::sync::mpsc;
 
 use crate::events::Event;
@@ -25,7 +24,7 @@ pub struct TestFunctions<T> {
 }
 
 pub struct TestRunner<T: TestLifecycle> {
-    data_manager: TestDataManager,
+    data: SuiteData,
     funcs: TestFunctions<T>,
     event_tx: mpsc::UnboundedSender<Event>,
     context: SysContext,
@@ -35,13 +34,13 @@ pub struct TestRunner<T: TestLifecycle> {
 impl<T: TestLifecycle> TestRunner<T> {
     pub fn new(
         funcs: TestFunctions<T>,
-        data: TestDataManager,
+        data: SuiteData,
         event_tx: mpsc::UnboundedSender<Event>,
         context: SysContext,
         fixture: T,
     ) -> Self {
         Self {
-            data_manager: data,
+            data,
             funcs,
             event_tx,
             context,
@@ -51,45 +50,33 @@ impl<T: TestLifecycle> TestRunner<T> {
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
-        self.data_manager.blocking_write(|d| {
-            let fixed_offset = FixedOffset::west_opt(0).unwrap();
-            d.start_time = Utc::now().with_timezone(&fixed_offset);
-            Ok(())
-        })?;
-        let num_tests = self.data_manager.blocking_read(|d| Ok(d.len()))?;
-
-        info!("Loop");
+        self.data.set_suite_start_time()?;
 
         self.fixture.setup()?;
 
-        for index in 0..num_tests {
-            self.data_manager.blocking_write(|d| {
-                d.current_index = index;
-                d.current_test_mut().state = TestState::Running(TestRunning::Running);
-                Ok(())
-            })?;
+        for (funcs, data) in self
+            .funcs
+            .funcs
+            .iter()
+            .zip(&self.data.current_test_metadata_iter())
+        {
+            data.set_state(TestState::Running(TestRunning::Running));
 
             self.fixture.before_test()?;
 
             let start_time = Instant::now();
-
-            let result = (self.funcs.funcs[index])(&mut self.context, &mut self.fixture);
-
+            let result = funcs(&mut self.context, &mut self.fixture);
             let test_duration = Instant::now() - start_time;
 
             self.fixture.after_test()?;
 
-            self.data_manager.blocking_write(|d| {
-                d.test_metadata[index].state = match result {
-                    Ok(_) => TestState::Done(TestDone::Passed),
-                    Err(e) => {
-                        error!("{:#?}", e);
-                        TestState::Done(TestDone::Failed)
-                    }
-                };
-                d.current_test_mut().duration = test_duration;
-                Ok(())
-            })?;
+            let final_state = match result {
+                Ok(_) => TestState::Done(TestDone::Passed),
+                Err(_) => TestState::Done(TestDone::Failed),
+            };
+
+            data.set_state(final_state)?;
+            self.data.set_current_test_duration(test_duration)?;
         }
 
         self.event_tx.send(Event::TestsCompleted)?;
@@ -107,7 +94,7 @@ impl<T: TestLifecycle> TestRunner<T> {
         let mut report = Report::new("htf2-run");
         let mut test_suite = TestSuite::new("htf2-suite");
 
-        let data = self.data_manager.blocking_get_copy();
+        let data = self.data.blocking_get_copy();
 
         for test in data.test_metadata {
             let test_case_result = match test.state {

@@ -8,7 +8,7 @@ pub(crate) mod ui;
 
 use cli_log::*;
 use color_eyre::eyre::Result;
-use test_runner::test_data::TestDataManager;
+use test_runner::test_data::SuiteData;
 use test_runner::{
     context::{dut::DUT, measurement::Measurements, user_text_input::TextInput},
     FuncType, TestFunctions, TestRunner,
@@ -63,17 +63,17 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
         let (input_tx, input_rx) = mpsc::unbounded_channel();
 
         let test_funcs = TestFunctions { funcs };
-        let test_data = TestDataManager::new(names, event_tx.clone());
+        let suite_data = SuiteData::new(names, event_tx.clone());
 
         let context = SysContext {
-            text_input: TextInput::new(event_tx.clone(), input_rx, test_data.clone()),
-            measurements: Measurements::new(test_data.clone()),
-            dut: DUT::new(test_data.clone()),
+            text_input: TextInput::new(event_tx.clone(), input_rx, suite_data.clone()),
+            measurements: Measurements::new(suite_data.clone()),
+            dut: DUT::new(suite_data.clone()),
         };
 
         let mut test_runner = TestRunner::new(
             test_funcs,
-            test_data.clone(),
+            suite_data.clone(),
             event_tx.clone(),
             context,
             fixture,
@@ -81,7 +81,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
 
         tokio::task::spawn_blocking(move || test_runner.run());
 
-        let mut app = app::App::new(test_data.clone(), event_rx, event_tx, input_tx)?;
+        let mut app = app::App::new(suite_data.clone(), event_rx, event_tx, input_tx)?;
 
         app.run().await
     })?;

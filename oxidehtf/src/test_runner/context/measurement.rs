@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{test_runner::TestDataManager, TestFailure};
+use crate::{
+    test_runner::{test_data::blocking_write, SuiteData},
+    TestFailure,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -22,11 +25,11 @@ pub struct MeasurementDefinition {
 
 pub struct Measurements {
     definitions: HashMap<String, MeasurementDefinition>,
-    test_data: TestDataManager,
+    test_data: SuiteData,
 }
 
 impl Measurements {
-    pub fn new(test_state: TestDataManager) -> Self {
+    pub fn new(test_state: SuiteData) -> Self {
         Measurements {
             definitions: HashMap::new(),
             test_data: test_state,
@@ -58,14 +61,13 @@ impl Measurements {
 
         def.value = Some(value.clone());
 
-        self.test_data
-            .blocking_write(|d| {
-                d.current_test_mut()
-                    .user_data
-                    .insert(name.into(), def.clone());
-                Ok(())
-            })
-            .unwrap();
+        blocking_write(&self.test_data.inner, &self.test_data.event_tx, |d| {
+            d.current_test_mut()
+                .user_data
+                .insert(name.into(), def.clone());
+            Ok(())
+        })
+        .unwrap();
 
         if let DataTypes::F64(value) = value {
             if let Some((min, max)) = def.range {
