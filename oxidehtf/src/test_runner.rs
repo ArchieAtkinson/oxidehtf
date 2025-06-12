@@ -17,33 +17,52 @@ pub mod lifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
-#[derive(Debug, Clone)]
-pub struct TestFunctions<T> {
-    pub funcs: Vec<FuncType<T>>,
+trait SuiteTestRunner: Send {
+    fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure>;
+
+    fn fixture(&mut self) -> &mut dyn TestLifecycle;
 }
 
-pub struct TestRunner<T: TestLifecycle> {
+#[derive(Debug, Clone)]
+pub struct ProvidedData<T: TestLifecycle + Send> {
+    pub functions: Vec<FuncType<T>>,
+    pub fixture: T,
+}
+
+impl<T: TestLifecycle + Send> SuiteTestRunner for ProvidedData<T> {
+    fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure> {
+        self.functions[index](context, &mut self.fixture)
+    }
+
+    fn fixture(&mut self) -> &mut dyn TestLifecycle {
+        &mut self.fixture
+    }
+}
+
+pub struct TestRunner {
     data: SuiteData,
-    funcs: TestFunctions<T>,
+    suite_funcs: Box<dyn SuiteTestRunner>,
     event_tx: mpsc::UnboundedSender<Event>,
     context: SysContext,
-    fixture: T,
 }
 
-impl<T: TestLifecycle> TestRunner<T> {
-    pub fn new(
-        funcs: TestFunctions<T>,
+impl TestRunner {
+    pub fn new<T: TestLifecycle + 'static + Send>(
+        funcs: Vec<FuncType<T>>,
         data: SuiteData,
         event_tx: mpsc::UnboundedSender<Event>,
         context: SysContext,
         fixture: T,
     ) -> Self {
+        let test_funcs = ProvidedData {
+            functions: funcs,
+            fixture,
+        };
         Self {
             data,
-            funcs,
+            suite_funcs: Box::new(test_funcs),
             event_tx,
             context,
-            fixture,
         }
     }
 
@@ -51,23 +70,18 @@ impl<T: TestLifecycle> TestRunner<T> {
         info!("Starting Test Runner");
         self.data.set_suite_start_time()?;
 
-        self.fixture.setup()?;
+        self.suite_funcs.fixture().setup()?;
 
-        for (funcs, data) in self
-            .funcs
-            .funcs
-            .iter()
-            .zip(&self.data.current_testdata_iter())
-        {
+        for (index, data) in self.data.current_testdata_iter().enumerate() {
             data.set_state(TestState::Running(TestRunning::Running))?;
 
-            self.fixture.before_test()?;
+            self.suite_funcs.fixture().before_test()?;
 
             let start_time = Instant::now();
-            let result = funcs(&mut self.context, &mut self.fixture);
+            let result = self.suite_funcs.run_test(index, &mut self.context);
             let test_duration = Instant::now() - start_time;
 
-            self.fixture.after_test()?;
+            self.suite_funcs.fixture().after_test()?;
 
             let final_state = match result {
                 Ok(_) => TestState::Done(TestDone::Passed),
@@ -80,7 +94,7 @@ impl<T: TestLifecycle> TestRunner<T> {
 
         self.event_tx.send(Event::TestsCompleted)?;
 
-        self.fixture.teardown()?;
+        self.suite_funcs.fixture().teardown()?;
 
         info!("Done");
 

@@ -12,7 +12,7 @@ use crate::{
     },
     events::Event,
     test_data::SuiteData,
-    test_runner::{FuncType, TestFunctions, TestRunner},
+    test_runner::{FuncType, TestRunner},
     ui::Ui,
     SysContext, TestLifecycle,
 };
@@ -24,12 +24,12 @@ pub enum AppState {
     Done,
 }
 
-pub struct App<T: TestLifecycle> {
+pub struct App {
     ui: Ui,
     state: AppState,
     suite_data: SuiteData,
     components: Vec<Box<dyn Component>>,
-    test_runner: Option<TestRunner<T>>,
+    test_runner: Option<TestRunner>,
     current_focus: usize,
     action_rx: mpsc::UnboundedReceiver<Action>,
     action_tx: mpsc::UnboundedSender<Action>,
@@ -38,18 +38,21 @@ pub struct App<T: TestLifecycle> {
     input_tx: mpsc::UnboundedSender<String>,
 }
 
-impl<T: TestLifecycle + Send + 'static> App<T> {
-    pub fn new(funcs: Vec<FuncType<T>>, names: Vec<&'static str>, fixture: T) -> Result<Self> {
+impl App {
+    pub fn new<T: TestLifecycle + 'static + Send>(
+        funcs: Vec<FuncType<T>>,
+        names: Vec<&'static str>,
+        fixture: T,
+    ) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let (input_tx, input_rx) = mpsc::unbounded_channel();
 
-        let test_funcs = TestFunctions { funcs };
         let suite_data = SuiteData::new(names, event_tx.clone());
 
         let context = SysContext::new(suite_data.clone(), event_tx.clone(), input_rx);
         let test_runner = TestRunner::new(
-            test_funcs,
+            funcs,
             suite_data.clone(),
             event_tx.clone(),
             context,

@@ -67,6 +67,7 @@ OxideHTF provides (or will...):
         - More colours
     - Integrate WASM crate for web control
     - Welcome Screen
+    - Summary Screen
     - Test Data Viewer 
 - Reporting
     - Junit ✅

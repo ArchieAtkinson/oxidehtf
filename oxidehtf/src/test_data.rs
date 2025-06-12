@@ -132,7 +132,7 @@ impl<'a> Iterator for &'a CurrentTestDataIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.current_index.get();
 
-        if index > self.number_of_tests {
+        if index >= self.number_of_tests {
             return None;
         }
         self.current_test.update_test_index(index).ok()?;
