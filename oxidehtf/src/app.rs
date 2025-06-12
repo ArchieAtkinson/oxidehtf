@@ -124,6 +124,8 @@ impl App {
             }
         }
 
+        Self::produce_junit_report(&self.suite_data).await?;
+
         Ok(())
     }
 
@@ -240,5 +242,37 @@ impl App {
                 self.current_focus
             );
         }
+    }
+
+    async fn produce_junit_report(data: &SuiteData) -> Result<()> {
+        use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+
+        let mut report = Report::new("htf2-run");
+        let mut test_suite = TestSuite::new("htf2-suite");
+
+        let data = data.get_raw_copy().await;
+
+        for test in data.test_metadata {
+            let test_case_result = match test.state {
+                TestState::Done(r) => match r {
+                    TestDone::Passed => TestCaseStatus::success(),
+                    TestDone::Failed => TestCaseStatus::non_success(NonSuccessKind::Failure),
+                },
+
+                _ => TestCaseStatus::non_success(NonSuccessKind::Error),
+            };
+            let mut test_case = TestCase::new(test.name, test_case_result);
+            test_case.set_time(test.duration);
+            test_suite.add_test_case(test_case);
+        }
+
+        report.add_test_suite(test_suite);
+        report.timestamp = Some(data.start_time);
+
+        let junit_file = std::fs::File::create("junit-report.xml")?;
+
+        report.serialize(junit_file)?;
+
+        Ok(())
     }
 }

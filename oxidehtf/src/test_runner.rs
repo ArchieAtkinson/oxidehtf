@@ -5,7 +5,6 @@ use color_eyre::Result;
 use context::SysContext;
 use errors::TestFailure;
 use lifecycle::TestLifecycle;
-use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 use tokio::sync::mpsc;
 
 use crate::events::Event;
@@ -17,19 +16,19 @@ pub mod lifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
-trait SuiteTestRunner: Send {
+trait SuiteTestExecuter: Send {
     fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure>;
 
     fn fixture(&mut self) -> &mut dyn TestLifecycle;
 }
 
 #[derive(Debug, Clone)]
-pub struct ProvidedData<T: TestLifecycle + Send> {
+pub struct FunctionsAndFixture<T: TestLifecycle + Send> {
     pub functions: Vec<FuncType<T>>,
     pub fixture: T,
 }
 
-impl<T: TestLifecycle + Send> SuiteTestRunner for ProvidedData<T> {
+impl<T: TestLifecycle + Send> SuiteTestExecuter for FunctionsAndFixture<T> {
     fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure> {
         self.functions[index](context, &mut self.fixture)
     }
@@ -39,9 +38,13 @@ impl<T: TestLifecycle + Send> SuiteTestRunner for ProvidedData<T> {
     }
 }
 
-pub struct TestRunner {
+pub struct TestSuite {
+    executer: Box<dyn SuiteTestExecuter>,
     data: SuiteData,
-    suite_funcs: Box<dyn SuiteTestRunner>,
+}
+
+pub struct TestRunner {
+    suite: TestSuite,
     event_tx: mpsc::UnboundedSender<Event>,
     context: SysContext,
 }
@@ -54,13 +57,15 @@ impl TestRunner {
         context: SysContext,
         fixture: T,
     ) -> Self {
-        let test_funcs = ProvidedData {
+        let test_funcs = FunctionsAndFixture {
             functions: funcs,
             fixture,
         };
         Self {
-            data,
-            suite_funcs: Box::new(test_funcs),
+            suite: TestSuite {
+                executer: Box::new(test_funcs),
+                data,
+            },
             event_tx,
             context,
         }
@@ -68,20 +73,20 @@ impl TestRunner {
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
-        self.data.set_suite_start_time()?;
+        self.suite.data.set_suite_start_time()?;
 
-        self.suite_funcs.fixture().setup()?;
+        self.suite.executer.fixture().setup()?;
 
-        for (index, data) in self.data.current_testdata_iter().enumerate() {
+        for (index, data) in self.suite.data.current_testdata_iter().enumerate() {
             data.set_state(TestState::Running(TestRunning::Running))?;
 
-            self.suite_funcs.fixture().before_test()?;
+            self.suite.executer.fixture().before_test()?;
 
             let start_time = Instant::now();
-            let result = self.suite_funcs.run_test(index, &mut self.context);
+            let result = self.suite.executer.run_test(index, &mut self.context);
             let test_duration = Instant::now() - start_time;
 
-            self.suite_funcs.fixture().after_test()?;
+            self.suite.executer.fixture().after_test()?;
 
             let final_state = match result {
                 Ok(_) => TestState::Done(TestDone::Passed),
@@ -94,41 +99,9 @@ impl TestRunner {
 
         self.event_tx.send(Event::TestsCompleted)?;
 
-        self.suite_funcs.fixture().teardown()?;
+        self.suite.executer.fixture().teardown()?;
 
         info!("Done");
-
-        self.produce_junit_report()?;
-
-        Ok(())
-    }
-
-    fn produce_junit_report(&self) -> Result<()> {
-        let mut report = Report::new("htf2-run");
-        let mut test_suite = TestSuite::new("htf2-suite");
-
-        let data = self.data.blocking_get_raw_copy();
-
-        for test in data.test_metadata {
-            let test_case_result = match test.state {
-                TestState::Done(r) => match r {
-                    TestDone::Passed => TestCaseStatus::success(),
-                    TestDone::Failed => TestCaseStatus::non_success(NonSuccessKind::Failure),
-                },
-
-                _ => TestCaseStatus::non_success(NonSuccessKind::Error),
-            };
-            let mut test_case = TestCase::new(test.name, test_case_result);
-            test_case.set_time(test.duration);
-            test_suite.add_test_case(test_case);
-        }
-
-        report.add_test_suite(test_suite);
-        report.timestamp = Some(data.start_time);
-
-        let junit_file = std::fs::File::create("junit-report.xml")?;
-
-        report.serialize(junit_file)?;
 
         Ok(())
     }
