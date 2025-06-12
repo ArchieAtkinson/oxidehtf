@@ -1,4 +1,4 @@
-use color_eyre::Result;
+use crate::common::*;
 
 pub trait TestLifecycle {
     fn setup(&mut self) -> Result<()> {

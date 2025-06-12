@@ -1,5 +1,3 @@
-// use cli_log::*;
-use color_eyre::Result;
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -9,7 +7,8 @@ use ratatui::{
 };
 
 use crate::{
-    test_data::{SuiteDataRaw, TestState},
+    common::*,
+    test_runner::{SuiteDataRaw, TestState},
     ui::UiAreas,
 };
 

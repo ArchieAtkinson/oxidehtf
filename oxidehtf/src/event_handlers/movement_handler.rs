@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 
-use crate::{actions::Action, events::Event};
+use crate::common::*;
 
 pub struct MovementHandler {}
 

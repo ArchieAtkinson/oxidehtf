@@ -1,20 +1,20 @@
 pub(crate) mod actions;
 pub(crate) mod app;
+pub(crate) mod common;
 pub(crate) mod components;
 pub(crate) mod event_handlers;
 pub(crate) mod events;
-pub(crate) mod test_data;
 pub(crate) mod test_runner;
 pub(crate) mod ui;
 
-use cli_log::*;
-use color_eyre::eyre::Result;
-use test_runner::FuncType;
-use tokio::runtime::Runtime;
+use common::*;
 
-pub use test_runner::context::{measurement::Unit, SysContext};
-pub use test_runner::errors::TestFailure;
-pub use test_runner::lifecycle::TestLifecycle;
+use test_runner::FuncType;
+
+pub use test_runner::context::measurement::Unit;
+pub use test_runner::SysContext;
+pub use test_runner::TestFailure;
+pub use test_runner::TestLifecycle;
 
 #[macro_export]
 macro_rules! assert_eq {
@@ -51,7 +51,7 @@ pub fn run_tests<T: Send + 'static + TestLifecycle>(
 ) -> Result<()> {
     init_cli_log!();
 
-    let rt = Runtime::new()?;
+    let rt = tokio::runtime::Runtime::new()?;
 
     info!("Starting");
 

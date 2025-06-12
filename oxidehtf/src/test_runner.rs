@@ -1,18 +1,19 @@
 use std::time::Instant;
 
-use cli_log::*;
-use color_eyre::Result;
-use context::SysContext;
-use errors::TestFailure;
-use lifecycle::TestLifecycle;
-use tokio::sync::mpsc;
-
-use crate::events::Event;
-use crate::test_data::{SuiteData, TestDone, TestRunning, TestState};
+use crate::common::*;
 
 pub mod context;
+pub mod data;
 pub mod errors;
 pub mod lifecycle;
+
+pub use context::measurement::MeasurementDefinition;
+pub use context::SysContext;
+pub use data::current_test::CurrentTestData;
+pub use data::suite::{SuiteData, SuiteDataRaw};
+pub use data::{TestDone, TestRunning, TestState};
+pub use errors::TestFailure;
+pub use lifecycle::TestLifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
@@ -45,7 +46,7 @@ pub struct TestSuite {
 
 pub struct TestRunner {
     suite: TestSuite,
-    event_tx: mpsc::UnboundedSender<Event>,
+    event_tx: UnboundedSender<Event>,
     context: SysContext,
 }
 
@@ -53,7 +54,7 @@ impl TestRunner {
     pub fn new<T: TestLifecycle + 'static + Send>(
         funcs: Vec<FuncType<T>>,
         data: SuiteData,
-        event_tx: mpsc::UnboundedSender<Event>,
+        event_tx: UnboundedSender<Event>,
         context: SysContext,
         fixture: T,
     ) -> Self {

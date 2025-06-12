@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use tui_input::InputRequest;
 
-use crate::{actions::Action, events::Event};
+use crate::common::*;
 
 pub struct TextInputHandler {}
 

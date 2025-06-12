@@ -1,4 +1,3 @@
-use color_eyre::eyre::Result;
 use crossterm::event::EventStream;
 use futures::StreamExt;
 use ratatui::{
@@ -7,9 +6,8 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::io::Stdout;
-use tokio::sync::mpsc;
 
-use crate::events::Event;
+use crate::common::*;
 
 pub struct UiAreas {
     pub test_progress: Rect,
@@ -21,11 +19,11 @@ pub struct UiAreas {
 
 pub struct Ui {
     terminal: Terminal<CrosstermBackend<Stdout>>,
-    event_tx: mpsc::UnboundedSender<Event>,
+    event_tx: UnboundedSender<Event>,
 }
 
 impl Ui {
-    pub fn new(event_tx: mpsc::UnboundedSender<Event>) -> Self {
+    pub fn new(event_tx: UnboundedSender<Event>) -> Self {
         Self {
             terminal: ratatui::init(),
             event_tx,
@@ -37,7 +35,7 @@ impl Ui {
         tokio::spawn(async { event_loop.await });
     }
 
-    pub async fn event_loop(event_tx: mpsc::UnboundedSender<Event>) {
+    pub async fn event_loop(event_tx: UnboundedSender<Event>) {
         loop {
             let mut stream = EventStream::new();
 

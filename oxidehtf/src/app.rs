@@ -1,18 +1,12 @@
-use cli_log::*;
-use color_eyre::eyre::{OptionExt, Result};
+use crate::common::*;
 use crossterm::event::{KeyCode, KeyModifiers};
-use tokio::sync::mpsc;
 
 use crate::{
-    actions::Action,
     components::{
-        completed_tests::CompletedTestDisplay, current_test::CurrentTestDisplay,
-        suite_progress::SuiteProgressDisplay, user_text_input::UserTextInput,
-        waiting_tests::WaitingTestDisplay, Component,
+        CompletedTestDisplay, Component, CurrentTestDisplay, SuiteProgressDisplay, UserTextInput,
+        WaitingTestDisplay,
     },
-    events::Event,
-    test_data::SuiteData,
-    test_runner::{FuncType, TestRunner},
+    test_runner::{FuncType, SuiteData, TestDone, TestRunner, TestState},
     ui::Ui,
     SysContext, TestLifecycle,
 };
@@ -31,11 +25,11 @@ pub struct App {
     components: Vec<Box<dyn Component>>,
     test_runner: Option<TestRunner>,
     current_focus: usize,
-    action_rx: mpsc::UnboundedReceiver<Action>,
-    action_tx: mpsc::UnboundedSender<Action>,
-    event_rx: mpsc::UnboundedReceiver<Event>,
-    event_tx: mpsc::UnboundedSender<Event>,
-    input_tx: mpsc::UnboundedSender<String>,
+    action_rx: UnboundedReceiver<Action>,
+    action_tx: UnboundedSender<Action>,
+    event_rx: UnboundedReceiver<Event>,
+    event_tx: UnboundedSender<Event>,
+    input_tx: UnboundedSender<String>,
 }
 
 impl App {
@@ -44,9 +38,9 @@ impl App {
         names: Vec<&'static str>,
         fixture: T,
     ) -> Result<Self> {
-        let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
-        let (input_tx, input_rx) = mpsc::unbounded_channel();
+        let (action_tx, action_rx) = unbounded_channel();
+        let (event_tx, event_rx) = unbounded_channel();
+        let (input_tx, input_rx) = unbounded_channel();
 
         let suite_data = SuiteData::new(names, event_tx.clone());
 

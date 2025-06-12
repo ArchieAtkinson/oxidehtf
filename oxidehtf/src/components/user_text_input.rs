@@ -1,4 +1,3 @@
-use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     layout::Rect,
@@ -6,18 +5,14 @@ use ratatui::{
     widgets::{Block, Paragraph},
     Frame,
 };
-use tokio::sync::mpsc;
 
-use crate::{
-    actions::Action, event_handlers::text_input_handler::TextInputHandler, events::Event,
-    test_data::SuiteDataRaw, ui::UiAreas,
-};
+use crate::{common::*, event_handlers::TextInputHandler, test_runner::SuiteDataRaw, ui::UiAreas};
 
 use super::Component;
 
 pub struct UserTextInput {
-    action_tx: Option<mpsc::UnboundedSender<Action>>,
-    event_tx: Option<mpsc::UnboundedSender<Event>>,
+    action_tx: Option<UnboundedSender<Action>>,
+    event_tx: Option<UnboundedSender<Event>>,
     txt_input: tui_input::Input,
     prompt: String,
     is_focused: bool,
@@ -71,12 +66,12 @@ impl Component for UserTextInput {
         "User Text Input"
     }
 
-    fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
+    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
         Ok(())
     }
 
-    fn register_event_handler(&mut self, tx: mpsc::UnboundedSender<Event>) -> Result<()> {
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
         self.event_tx = Some(tx.clone());
         Ok(())
     }

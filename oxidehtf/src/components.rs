@@ -1,13 +1,17 @@
-use crate::{actions::Action, events::Event, test_data::SuiteDataRaw, ui::UiAreas};
-use color_eyre::Result;
+use crate::{common::*, test_runner::data::suite::SuiteDataRaw, ui::UiAreas};
 use ratatui::Frame;
-use tokio::sync::mpsc::UnboundedSender;
 
 pub mod completed_tests;
 pub mod current_test;
 pub mod suite_progress;
 pub mod user_text_input;
 pub mod waiting_tests;
+
+pub use completed_tests::CompletedTestDisplay;
+pub use current_test::CurrentTestDisplay;
+pub use suite_progress::SuiteProgressDisplay;
+pub use user_text_input::UserTextInput;
+pub use waiting_tests::WaitingTestDisplay;
 
 pub trait Component {
     fn init(&mut self) -> Result<()> {

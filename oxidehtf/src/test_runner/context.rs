@@ -1,9 +1,8 @@
 use dut::Dut;
 use measurement::Measurements;
-use tokio::sync::mpsc;
 use user_text_input::TextInput;
 
-use crate::{events::Event, test_data::SuiteData};
+use crate::{common::*, test_runner::SuiteData};
 
 pub mod dut;
 pub mod measurement;
@@ -18,8 +17,8 @@ pub struct SysContext {
 impl SysContext {
     pub fn new(
         suite_data: SuiteData,
-        event_tx: mpsc::UnboundedSender<Event>,
-        input_rx: mpsc::UnboundedReceiver<String>,
+        event_tx: UnboundedSender<Event>,
+        input_rx: UnboundedReceiver<String>,
     ) -> Self {
         let current_test = suite_data.current_test_ref();
         Self {

@@ -1,8 +1,6 @@
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-
 use crate::{
-    events::Event,
-    test_data::{CurrentTestData, TestRunning, TestState},
+    common::*,
+    test_runner::{CurrentTestData, TestRunning, TestState},
 };
 
 pub struct TextInput {

@@ -1,6 +1,3 @@
-// use cli_log::info;
-// use cli_log::*;
-use color_eyre::Result;
 use ratatui::layout::Margin;
 use ratatui::widgets::{Block, Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
@@ -9,13 +6,11 @@ use ratatui::{
     widgets::{Row, Table, TableState},
     Frame,
 };
-use tokio::sync::mpsc;
 
 use crate::{
-    actions::Action,
-    event_handlers::movement_handler::MovementHandler,
-    events::Event,
-    test_data::{SuiteDataRaw, TestState},
+    common::*,
+    event_handlers::MovementHandler,
+    test_runner::{SuiteDataRaw, TestState},
     ui::UiAreas,
 };
 
@@ -27,8 +22,8 @@ enum Scroll {
 }
 
 pub struct CurrentTestDisplay {
-    action_tx: Option<mpsc::UnboundedSender<Action>>,
-    event_tx: Option<mpsc::UnboundedSender<Event>>,
+    action_tx: Option<UnboundedSender<Action>>,
+    event_tx: Option<UnboundedSender<Event>>,
     table_state: TableState,
     scrollbar_state: ScrollbarState,
     is_focused: bool,
@@ -175,17 +170,17 @@ impl Component for CurrentTestDisplay {
         "Current Test Measurements"
     }
 
-    fn register_action_handler(&mut self, tx: mpsc::UnboundedSender<Action>) -> Result<()> {
+    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx.clone());
         Ok(())
     }
 
-    fn register_event_handler(&mut self, tx: mpsc::UnboundedSender<Event>) -> Result<()> {
+    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
         self.event_tx = Some(tx.clone());
         Ok(())
     }
 
-    fn handle_events(&mut self, event: crate::events::Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
         if self.is_focused {
             Ok(MovementHandler::handle_event(event))
         } else {
