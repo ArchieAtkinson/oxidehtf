@@ -1,5 +1,7 @@
 use tui_input::InputRequest;
 
+use crate::app::Screen;
+
 #[derive(Debug, Clone)]
 pub enum Action {
     SendInput,
@@ -11,4 +13,5 @@ pub enum Action {
     MoveUp,
     MoveDown,
     InputRequest(InputRequest),
+    ChangeScreen(Screen),
 }

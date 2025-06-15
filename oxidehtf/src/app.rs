@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use crate::common::*;
 use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::{
     components::{
         CompletedTestDisplay, Component, CurrentTestDisplay, SuiteProgressDisplay, UserTextInput,
-        WaitingTestDisplay,
+        WaitingTestDisplay, WeclomeDisplay,
     },
     test_runner::{FuncType, SuiteData, TestDone, TestRunner, TestState},
     ui::Ui,
@@ -18,13 +20,21 @@ pub enum AppState {
     Done,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Screen {
+    #[default]
+    Welcome,
+    RunningTests,
+}
+
 pub struct App {
     ui: Ui,
     state: AppState,
     suite_data: SuiteData,
-    components: Vec<Box<dyn Component>>,
+    components: HashMap<Screen, Vec<Box<dyn Component>>>,
     test_runner: Option<TestRunner>,
     current_focus: usize,
+    current_screen: Screen,
     action_rx: UnboundedReceiver<Action>,
     action_tx: UnboundedSender<Action>,
     event_rx: UnboundedReceiver<Event>,
@@ -53,19 +63,27 @@ impl App {
             fixture,
         );
 
+        let running_tests_screen: Vec<Box<dyn Component>> = vec![
+            // User text input first to start as focus
+            Box::new(UserTextInput::new()),
+            Box::new(SuiteProgressDisplay::new()),
+            Box::new(WaitingTestDisplay::new()),
+            Box::new(CompletedTestDisplay::new()),
+            Box::new(CurrentTestDisplay::new()),
+        ];
+
+        let welcome_screen: Vec<Box<dyn Component>> = vec![Box::new(WeclomeDisplay::new())];
+
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
             suite_data,
-            components: vec![
-                // User text input first to start as focus
-                Box::new(UserTextInput::new()),
-                Box::new(SuiteProgressDisplay::new()),
-                Box::new(WaitingTestDisplay::new()),
-                Box::new(CompletedTestDisplay::new()),
-                Box::new(CurrentTestDisplay::new()),
-            ],
+            components: HashMap::from([
+                (Screen::RunningTests, running_tests_screen),
+                (Screen::Welcome, welcome_screen),
+            ]),
             test_runner: Some(test_runner),
             current_focus: 0,
+            current_screen: Screen::Welcome,
             state: Default::default(),
             action_rx,
             action_tx,
@@ -80,7 +98,7 @@ impl App {
         let mut runner_handle = tokio::task::spawn_blocking(move || test_runner.run());
         let mut is_runner_done = false;
 
-        for component in self.components.iter_mut() {
+        for component in self.components.values_mut().flat_map(|v| v.iter_mut()) {
             component.register_event_handler(self.event_tx.clone())?;
             component.register_action_handler(self.action_tx.clone())?;
             component.init()?;
@@ -88,7 +106,8 @@ impl App {
 
         self.ui.start();
 
-        self.components[self.current_focus].focus();
+        let current_focus = self.current_focus;
+        self.active_components()?[current_focus].focus();
 
         info!("Spawning Test Runner");
 
@@ -96,12 +115,19 @@ impl App {
             self.handle_event().await?;
             self.handle_actions().await?;
             let state = self.suite_data.get_raw_copy().await;
+            let mut active_components = self
+                .components
+                .remove(&self.current_screen)
+                .ok_or_eyre("Failed to get Screen Components")?;
             self.ui.render(|f, a| {
-                for component in self.components.iter_mut() {
+                for component in active_components.iter_mut() {
                     component.draw(f, &a, &state)?;
                 }
                 Ok(())
             })?;
+
+            self.components
+                .insert(self.current_screen, active_components);
 
             if !is_runner_done {
                 tokio::select! {
@@ -143,10 +169,15 @@ impl App {
             self.action_tx.send(action)?;
         }
 
-        for component in self.components.iter_mut() {
-            if let Some(action) = component.handle_events(event.clone())? {
-                self.action_tx.send(action)?;
+        let mut actions = Vec::new();
+        for component in self.active_components()? {
+            if let Some(new_action) = component.handle_events(event.clone())? {
+                actions.push(new_action);
             }
+        }
+
+        for action in actions {
+            self.action_tx.send(action)?;
         }
 
         Ok(())
@@ -158,16 +189,25 @@ impl App {
         while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 ExitApp => self.state = AppState::Done,
-                FocusNextPane => self.focus_next(),
-                FocusPreviousPane => self.focus_previous(),
+                FocusNextPane => self.focus_next()?,
+                FocusPreviousPane => self.focus_previous()?,
                 UserInputValue(s) => self.input_tx.send(s)?,
+                ChangeScreen(s) => {
+                    self.current_screen = s;
+                    self.focus_default()?;
+                }
                 _ => (),
             }
 
-            for component in self.components.iter_mut() {
+            let mut actions = Vec::new();
+            for component in self.active_components()? {
                 if let Some(new_action) = component.update(action.clone())? {
-                    self.action_tx.send(new_action)?;
+                    actions.push(new_action);
                 }
+            }
+
+            for action in actions {
+                self.action_tx.send(action)?;
             }
         }
 
@@ -178,10 +218,17 @@ impl App {
         self.state
     }
 
-    fn focus_next(&mut self) {
-        self.components[self.current_focus].blur();
+    fn focus_default(&mut self) -> Result<()> {
+        self.active_components()?[0].focus();
+        self.current_focus = 0;
+        Ok(())
+    }
 
-        let len = self.components.len();
+    fn focus_next(&mut self) -> Result<()> {
+        let current_focus = self.current_focus;
+        self.active_components()?[current_focus].blur();
+
+        let len = self.active_components()?.len();
 
         let start_search_index = self.current_focus + 1;
         let mut next_focus_index = 0;
@@ -190,7 +237,7 @@ impl App {
 
         for i in 0..len {
             let index = (start_search_index + i) % len;
-            if self.components[index].can_focus() {
+            if self.active_components()?[index].can_focus() {
                 next_focus_index = index;
                 found_next_focusable = true;
                 break;
@@ -198,7 +245,7 @@ impl App {
         }
 
         if found_next_focusable {
-            self.components[next_focus_index].focus();
+            self.active_components()?[next_focus_index].focus();
             self.current_focus = next_focus_index;
         } else {
             panic!(
@@ -206,12 +253,14 @@ impl App {
                 self.current_focus
             );
         }
+        Ok(())
     }
 
-    fn focus_previous(&mut self) {
-        self.components[self.current_focus].blur();
+    fn focus_previous(&mut self) -> Result<()> {
+        let current_focus = self.current_focus;
+        self.active_components()?[current_focus].blur();
 
-        let len = self.components.len();
+        let len = self.active_components()?.len();
 
         let start_search_index = self.current_focus;
         let mut next_focus_index = 0;
@@ -220,7 +269,7 @@ impl App {
 
         for i in 0..len {
             let index = (start_search_index + len - 1 - i) % len;
-            if self.components[index].can_focus() {
+            if self.active_components()?[index].can_focus() {
                 next_focus_index = index;
                 found_next_focusable = true;
                 break;
@@ -228,7 +277,7 @@ impl App {
         }
 
         if found_next_focusable {
-            self.components[next_focus_index].focus();
+            self.active_components()?[next_focus_index].focus();
             self.current_focus = next_focus_index;
         } else {
             panic!(
@@ -236,6 +285,8 @@ impl App {
                 self.current_focus
             );
         }
+
+        Ok(())
     }
 
     async fn produce_junit_report(data: &SuiteData) -> Result<()> {
@@ -268,5 +319,11 @@ impl App {
         report.serialize(junit_file)?;
 
         Ok(())
+    }
+
+    fn active_components(&mut self) -> Result<&mut Vec<Box<dyn Component>>> {
+        self.components
+            .get_mut(&self.current_screen)
+            .ok_or_eyre("No Screen Present")
     }
 }

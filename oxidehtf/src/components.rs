@@ -6,12 +6,14 @@ pub mod current_test;
 pub mod suite_progress;
 pub mod user_text_input;
 pub mod waiting_tests;
+pub mod welcome;
 
 pub use completed_tests::CompletedTestDisplay;
 pub use current_test::CurrentTestDisplay;
 pub use suite_progress::SuiteProgressDisplay;
 pub use user_text_input::UserTextInput;
 pub use waiting_tests::WaitingTestDisplay;
+pub use welcome::WeclomeDisplay;
 
 pub trait Component {
     fn init(&mut self) -> Result<()> {
