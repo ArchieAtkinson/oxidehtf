@@ -115,19 +115,17 @@ impl App {
             self.handle_event().await?;
             self.handle_actions().await?;
             let state = self.suite_data.get_raw_copy().await;
-            let mut active_components = self
-                .components
-                .remove(&self.current_screen)
-                .ok_or_eyre("Failed to get Screen Components")?;
             self.ui.render(|f, a| {
-                for component in active_components.iter_mut() {
+                for component in self
+                    .components
+                    .get_mut(&self.current_screen)
+                    .ok_or_eyre("Screen not present")?
+                    .iter_mut()
+                {
                     component.draw(f, &a, &state)?;
                 }
                 Ok(())
             })?;
-
-            self.components
-                .insert(self.current_screen, active_components);
 
             if !is_runner_done {
                 tokio::select! {
@@ -169,15 +167,15 @@ impl App {
             self.action_tx.send(action)?;
         }
 
-        let mut actions = Vec::new();
-        for component in self.active_components()? {
+        for component in self
+            .components
+            .get_mut(&self.current_screen)
+            .ok_or_eyre("Screen not present")?
+            .iter_mut()
+        {
             if let Some(new_action) = component.handle_events(event.clone())? {
-                actions.push(new_action);
+                self.action_tx.send(new_action)?;
             }
-        }
-
-        for action in actions {
-            self.action_tx.send(action)?;
         }
 
         Ok(())
@@ -199,15 +197,15 @@ impl App {
                 _ => (),
             }
 
-            let mut actions = Vec::new();
-            for component in self.active_components()? {
+            for component in self
+                .components
+                .get_mut(&self.current_screen)
+                .ok_or_eyre("Screen not present")?
+                .iter_mut()
+            {
                 if let Some(new_action) = component.update(action.clone())? {
-                    actions.push(new_action);
+                    self.action_tx.send(new_action)?;
                 }
-            }
-
-            for action in actions {
-                self.action_tx.send(action)?;
             }
         }
 
