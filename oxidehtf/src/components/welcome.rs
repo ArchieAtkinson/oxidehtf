@@ -1,6 +1,6 @@
 use crate::{app::Screen, common::*};
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::Style,
     widgets::{Block, Paragraph},
     Frame,
@@ -28,14 +28,30 @@ impl WeclomeDisplay {
     fn render_progress(&self, frame: &mut Frame, area: Rect, _data: &SuiteDataRaw) {
         let text = vec![
             "Welcome to OxideHTF!".into(),
-            "Press Tab to change focus, and Esc to quit".into(),
-            "Press any other key to start".into(),
+            "Press Tab to change focus, and Esc to quit.".into(),
+            "Press any other key to start.".into(),
         ];
+
+        let [top_area, centre_area, bottom_area] = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Max(text.len() as u16),
+            Constraint::Min(1),
+        ])
+        .flex(Flex::Center)
+        .areas(area);
+
+        let style = Style::default();
+
+        let padding_top = Block::new().style(style);
+        let padding_bottom = Block::new().style(style);
+
         let welcome_text = Paragraph::new(text)
-            .block(Block::bordered())
-            .style(Style::new().black().on_white())
+            .style(style)
             .alignment(Alignment::Center);
-        frame.render_widget(welcome_text, area);
+
+        frame.render_widget(padding_top, top_area);
+        frame.render_widget(welcome_text, centre_area);
+        frame.render_widget(padding_bottom, bottom_area);
     }
 }
 
