@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::common::*;
@@ -44,6 +45,24 @@ pub struct TestSuite {
     data: SuiteData,
 }
 
+impl TestSuite {
+    pub fn new<T: TestLifecycle + 'static + Send>(
+        funcs: Vec<FuncType<T>>,
+        data: SuiteData,
+        fixture: T,
+    ) -> Self {
+        let funcs_n_fixture = FunctionsAndFixture {
+            functions: funcs,
+            fixture,
+        };
+
+        Self {
+            executer: Box::new(funcs_n_fixture),
+            data,
+        }
+    }
+}
+
 pub struct TestRunner {
     suite: TestSuite,
     event_tx: UnboundedSender<Event>,
@@ -58,15 +77,8 @@ impl TestRunner {
         context: SysContext,
         fixture: T,
     ) -> Self {
-        let test_funcs = FunctionsAndFixture {
-            functions: funcs,
-            fixture,
-        };
         Self {
-            suite: TestSuite {
-                executer: Box::new(test_funcs),
-                data,
-            },
+            suite: TestSuite::new(funcs, data, fixture),
             event_tx,
             context,
         }
