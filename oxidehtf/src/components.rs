@@ -20,6 +20,7 @@ pub trait Component {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 
     fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {

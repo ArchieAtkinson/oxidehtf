@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::{common::*, TestSuiteInventory};
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -10,7 +10,6 @@ use crate::{
     },
     test_runner::{SuiteData, TestDone, TestRunner, TestState},
     ui::Ui,
-    SysContext,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -35,25 +34,24 @@ pub struct App {
     test_runner: Option<TestRunner>,
     current_focus: usize,
     current_screen: Screen,
-    actions: VecDeque<Action>,
+    action_rx: broadcast::Receiver<Action>,
+    action_tx: broadcast::Sender<Action>,
     event_rx: UnboundedReceiver<Event>,
     event_tx: UnboundedSender<Event>,
-    input_tx: UnboundedSender<String>,
 }
 
 impl App {
     pub fn new(inventory: TestSuiteInventory) -> Result<Self> {
         let (event_tx, event_rx) = unbounded_channel();
-        let (input_tx, input_rx) = unbounded_channel();
+        let (action_tx, action_rx) = broadcast::channel(16);
 
         let suite_data = SuiteData::new(inventory.names.clone(), event_tx.clone());
 
-        let context = SysContext::new(suite_data.clone(), event_tx.clone(), input_rx);
         let test_runner = TestRunner::new(
             inventory.executer,
             suite_data.clone(),
             event_tx.clone(),
-            context,
+            action_tx.clone(),
         );
 
         let running_tests_screen: Vec<Box<dyn Component>> = vec![
@@ -78,10 +76,10 @@ impl App {
             current_focus: 0,
             current_screen: Screen::Welcome,
             state: Default::default(),
-            actions: VecDeque::new(),
+            action_tx,
+            action_rx,
             event_rx,
             event_tx,
-            input_tx,
         })
     }
 
@@ -100,7 +98,18 @@ impl App {
         let current_focus = self.current_focus;
         self.active_components()?[current_focus].focus();
 
-        info!("Spawning Test Runner");
+        let state = self.suite_data.get_raw_copy().await;
+        self.ui.render(|f, a| {
+            for component in self
+                .components
+                .get_mut(&self.current_screen)
+                .ok_or_eyre("Screen not present")?
+                .iter_mut()
+            {
+                component.draw(f, &a, &state)?;
+            }
+            Ok(())
+        })?;
 
         while self.state() != AppState::Done {
             self.handle_event().await?;
@@ -155,7 +164,7 @@ impl App {
         };
 
         if let Some(action) = action {
-            self.actions.push_back(action);
+            self.action_tx.send(action)?;
         }
 
         for component in self
@@ -165,7 +174,7 @@ impl App {
             .iter_mut()
         {
             if let Some(new_action) = component.handle_events(event.clone())? {
-                self.actions.push_back(new_action);
+                self.action_tx.send(new_action)?;
             }
         }
 
@@ -175,13 +184,15 @@ impl App {
     async fn handle_actions(&mut self) -> Result<()> {
         use Action::*;
 
-        while let Some(action) = self.actions.pop_front() {
+        while let Ok(action) = self.action_rx.try_recv() {
             match action.clone() {
                 ExitApp => self.state = AppState::Done,
                 FocusNextPane => self.focus_next()?,
                 FocusPreviousPane => self.focus_previous()?,
-                UserInputValue(s) => self.input_tx.send(s)?,
                 ChangeScreen(s) => {
+                    if s == Screen::RunningTests {
+                        self.action_tx.send(Action::StartTests)?;
+                    }
                     self.current_screen = s;
                     self.focus_default()?;
                 }
@@ -195,7 +206,7 @@ impl App {
                 .iter_mut()
             {
                 if let Some(new_action) = component.update(action.clone())? {
-                    self.actions.push_back(new_action);
+                    self.action_tx.send(new_action)?;
                 }
             }
         }

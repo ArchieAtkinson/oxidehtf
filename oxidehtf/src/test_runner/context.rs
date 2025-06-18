@@ -18,11 +18,11 @@ impl SysContext {
     pub fn new(
         suite_data: SuiteData,
         event_tx: UnboundedSender<Event>,
-        input_rx: UnboundedReceiver<String>,
+        action_rx: broadcast::Receiver<Action>,
     ) -> Self {
         let current_test = suite_data.current_test_ref();
         Self {
-            text_input: TextInput::new(event_tx.clone(), input_rx, current_test.clone()),
+            text_input: TextInput::new(event_tx.clone(), action_rx, current_test.clone()),
             measurements: Measurements::new(current_test.clone()),
             dut: Dut::new(suite_data),
         }

@@ -18,11 +18,13 @@ pub struct UserTextInput {
 }
 
 impl UserTextInput {
+    const DEFAULT_PROMPT: &'static str = "No Input Required";
+
     pub fn new() -> Self {
         Self {
             event_tx: Default::default(),
             txt_input: Default::default(),
-            prompt: String::new(),
+            prompt: Self::DEFAULT_PROMPT.into(),
             is_focused: false,
         }
     }
@@ -86,7 +88,7 @@ impl Component for UserTextInput {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::InputRequest(e) => {
+            Action::UserKeyInputRequest(e) => {
                 if !self.is_focused {
                     return Ok(None);
                 }
@@ -96,6 +98,7 @@ impl Component for UserTextInput {
             }
             Action::SendInput => {
                 let input = self.txt_input.value_and_reset();
+                self.prompt = Self::DEFAULT_PROMPT.into();
                 return Ok(Some(Action::UserInputValue(input)));
             }
             Action::UserInputPrompt(v) => self.prompt = v,

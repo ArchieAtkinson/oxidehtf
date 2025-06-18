@@ -24,6 +24,6 @@ impl TextInputHandler {
             (_, _) => None,
         };
 
-        request.map(|v| Action::InputRequest(v))
+        request.map(|v| Action::UserKeyInputRequest(v))
     }
 }

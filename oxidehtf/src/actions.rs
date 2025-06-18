@@ -12,6 +12,7 @@ pub enum Action {
     FocusPreviousPane,
     MoveUp,
     MoveDown,
-    InputRequest(InputRequest),
+    UserKeyInputRequest(InputRequest),
     ChangeScreen(Screen),
+    StartTests,
 }

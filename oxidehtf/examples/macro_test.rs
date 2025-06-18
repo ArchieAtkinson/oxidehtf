@@ -7,6 +7,7 @@ mod tests {
     use oxidehtf::{SysContext, TestLifecycle};
 
     pub struct Fixture {}
+
     impl TestLifecycle for Fixture {}
 
     #[fixture]

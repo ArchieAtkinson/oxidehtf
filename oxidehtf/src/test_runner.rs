@@ -87,6 +87,7 @@ inventory::collect!(TestSuiteInventoryFactory);
 pub struct TestRunner {
     suite: TestSuite,
     event_tx: UnboundedSender<Event>,
+    action_rx: broadcast::Receiver<Action>,
     context: SysContext,
 }
 
@@ -95,17 +96,29 @@ impl TestRunner {
         executer: Box<dyn SuiteTestExecuter>,
         data: SuiteData,
         event_tx: UnboundedSender<Event>,
-        context: SysContext,
+        action_tx: broadcast::Sender<Action>,
     ) -> Self {
         Self {
-            suite: TestSuite::new(executer, data),
-            event_tx,
-            context,
+            suite: TestSuite::new(executer, data.clone()),
+            event_tx: event_tx.clone(),
+            action_rx: action_tx.subscribe(),
+            context: SysContext::new(data.clone(), event_tx, action_tx.subscribe()),
         }
     }
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
+
+        loop {
+            if let Ok(action) = self.action_rx.blocking_recv() {
+                match action {
+                    Action::StartTests => break,
+                    _ => (),
+                }
+            }
+        }
+
+        info!("Starting Tests");
 
         self.suite.executer.fixture_init();
 
