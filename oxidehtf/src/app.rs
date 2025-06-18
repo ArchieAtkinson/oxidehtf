@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{common::*, TestSuiteInventory};
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -8,9 +8,9 @@ use crate::{
         CompletedTestDisplay, Component, CurrentTestDisplay, SuiteProgressDisplay, UserTextInput,
         WaitingTestDisplay, WeclomeDisplay,
     },
-    test_runner::{FuncType, SuiteData, TestDone, TestRunner, TestState},
+    test_runner::{SuiteData, TestDone, TestRunner, TestState},
     ui::Ui,
-    SysContext, TestLifecycle,
+    SysContext,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -35,8 +35,7 @@ pub struct App {
     test_runner: Option<TestRunner>,
     current_focus: usize,
     current_screen: Screen,
-    action_rx: UnboundedReceiver<Action>,
-    action_tx: UnboundedSender<Action>,
+    actions: VecDeque<Action>,
     event_rx: UnboundedReceiver<Event>,
     event_tx: UnboundedSender<Event>,
     input_tx: UnboundedSender<String>,
@@ -44,7 +43,6 @@ pub struct App {
 
 impl App {
     pub fn new(inventory: TestSuiteInventory) -> Result<Self> {
-        let (action_tx, action_rx) = unbounded_channel();
         let (event_tx, event_rx) = unbounded_channel();
         let (input_tx, input_rx) = unbounded_channel();
 
@@ -80,8 +78,7 @@ impl App {
             current_focus: 0,
             current_screen: Screen::Welcome,
             state: Default::default(),
-            action_rx,
-            action_tx,
+            actions: VecDeque::new(),
             event_rx,
             event_tx,
             input_tx,
@@ -95,7 +92,6 @@ impl App {
 
         for component in self.components.values_mut().flat_map(|v| v.iter_mut()) {
             component.register_event_handler(self.event_tx.clone())?;
-            component.register_action_handler(self.action_tx.clone())?;
             component.init()?;
         }
 
@@ -159,7 +155,7 @@ impl App {
         };
 
         if let Some(action) = action {
-            self.action_tx.send(action)?;
+            self.actions.push_back(action);
         }
 
         for component in self
@@ -169,7 +165,7 @@ impl App {
             .iter_mut()
         {
             if let Some(new_action) = component.handle_events(event.clone())? {
-                self.action_tx.send(new_action)?;
+                self.actions.push_back(new_action);
             }
         }
 
@@ -179,7 +175,7 @@ impl App {
     async fn handle_actions(&mut self) -> Result<()> {
         use Action::*;
 
-        while let Ok(action) = self.action_rx.try_recv() {
+        while let Some(action) = self.actions.pop_front() {
             match action.clone() {
                 ExitApp => self.state = AppState::Done,
                 FocusNextPane => self.focus_next()?,
@@ -199,7 +195,7 @@ impl App {
                 .iter_mut()
             {
                 if let Some(new_action) = component.update(action.clone())? {
-                    self.action_tx.send(new_action)?;
+                    self.actions.push_back(new_action);
                 }
             }
         }

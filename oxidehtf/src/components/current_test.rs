@@ -22,7 +22,6 @@ enum Scroll {
 }
 
 pub struct CurrentTestDisplay {
-    action_tx: Option<UnboundedSender<Action>>,
     event_tx: Option<UnboundedSender<Event>>,
     table_state: TableState,
     scrollbar_state: ScrollbarState,
@@ -34,7 +33,6 @@ pub struct CurrentTestDisplay {
 impl CurrentTestDisplay {
     pub fn new() -> Self {
         Self {
-            action_tx: None,
             event_tx: None,
             table_state: TableState::default(),
             is_focused: false,
@@ -168,11 +166,6 @@ impl Component for CurrentTestDisplay {
 
     fn name(&self) -> &str {
         "Current Test Measurements"
-    }
-
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.action_tx = Some(tx.clone());
-        Ok(())
     }
 
     fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, ItemMod, ReturnType, Type, Visibility, parse_macro_input, token};
+use syn::{ItemFn, ItemMod, Visibility, parse_macro_input, token};
 
 enum FuncKind {
     None,

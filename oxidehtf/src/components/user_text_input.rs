@@ -11,7 +11,6 @@ use crate::{common::*, event_handlers::TextInputHandler, test_runner::SuiteDataR
 use super::Component;
 
 pub struct UserTextInput {
-    action_tx: Option<UnboundedSender<Action>>,
     event_tx: Option<UnboundedSender<Event>>,
     txt_input: tui_input::Input,
     prompt: String,
@@ -21,7 +20,6 @@ pub struct UserTextInput {
 impl UserTextInput {
     pub fn new() -> Self {
         Self {
-            action_tx: Default::default(),
             event_tx: Default::default(),
             txt_input: Default::default(),
             prompt: String::new(),
@@ -64,11 +62,6 @@ impl Component for UserTextInput {
 
     fn name(&self) -> &str {
         "User Text Input"
-    }
-
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.action_tx = Some(tx.clone());
-        Ok(())
     }
 
     fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {

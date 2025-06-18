@@ -9,8 +9,6 @@ pub(crate) mod ui;
 
 use common::*;
 
-use test_runner::FuncType;
-
 pub use test_runner::context::measurement::Unit;
 pub use test_runner::SysContext;
 pub use test_runner::TestFailure;

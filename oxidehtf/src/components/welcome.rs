@@ -11,7 +11,6 @@ use crate::{test_runner::SuiteDataRaw, ui::UiAreas};
 use super::Component;
 
 pub struct WeclomeDisplay {
-    action_tx: Option<UnboundedSender<Action>>,
     event_tx: Option<UnboundedSender<Event>>,
     is_focused: bool,
 }
@@ -19,7 +18,6 @@ pub struct WeclomeDisplay {
 impl WeclomeDisplay {
     pub fn new() -> Self {
         Self {
-            action_tx: None,
             event_tx: None,
             is_focused: false,
         }
@@ -58,11 +56,6 @@ impl WeclomeDisplay {
 impl Component for WeclomeDisplay {
     fn name(&self) -> &str {
         "Test Suite Progress Display"
-    }
-
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.action_tx = Some(tx.clone());
-        Ok(())
     }
 
     fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {

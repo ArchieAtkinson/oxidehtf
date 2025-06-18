@@ -22,11 +22,6 @@ pub trait Component {
 
     fn name(&self) -> &str;
 
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        let _ = tx;
-        Ok(())
-    }
-
     fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
         let _ = tx;
         Ok(())
