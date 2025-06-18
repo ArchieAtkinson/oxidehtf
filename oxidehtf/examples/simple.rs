@@ -9,6 +9,10 @@ pub struct Fixture {}
 
 impl TestLifecycle for Fixture {}
 
+fn fixture() -> Fixture {
+    Fixture {}
+}
+
 fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
     info!("Running Test1");
 
@@ -64,8 +68,18 @@ fn test2_with_longer_name(
     Ok(())
 }
 
+fn create_suite_inventory() -> oxidehtf::TestSuiteInventory {
+    oxidehtf::TestSuiteInventory::new(
+        vec![test1, test2_with_longer_name],
+        fixture,
+        vec!["test1", "test2"],
+    )
+}
+
+inventory::submit! {
+    oxidehtf::TestSuiteInventoryFactory {func: create_suite_inventory}
+}
+
 fn main() -> Result<()> {
-    let (funcs, names) = oxidehtf::register_tests!(test1, test2_with_longer_name);
-    let context = Fixture::default();
-    oxidehtf::run_tests(funcs, names, context)
+    oxidehtf::run_tests()
 }

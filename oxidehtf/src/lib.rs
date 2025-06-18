@@ -15,6 +15,8 @@ pub use test_runner::context::measurement::Unit;
 pub use test_runner::SysContext;
 pub use test_runner::TestFailure;
 pub use test_runner::TestLifecycle;
+pub use test_runner::TestSuiteInventory;
+pub use test_runner::TestSuiteInventoryFactory;
 
 #[macro_export]
 macro_rules! assert_eq {
@@ -44,19 +46,22 @@ macro_rules! register_tests {
     };
 }
 
-pub fn run_tests<T: Send + 'static + TestLifecycle>(
-    funcs: Vec<FuncType<T>>,
-    names: Vec<&'static str>,
-    fixture: T,
-) -> Result<()> {
+pub fn run_tests() -> Result<()> {
     init_cli_log!();
 
     let rt = tokio::runtime::Runtime::new()?;
 
     info!("Starting");
 
+    let factory = inventory::iter::<TestSuiteInventoryFactory>
+        .into_iter()
+        .nth(0)
+        .unwrap();
+
+    let suite = (factory.func)();
+
     rt.block_on(async move {
-        let mut app = app::App::new(funcs, names, fixture)?;
+        let mut app = app::App::new(suite)?;
         app.run().await
     })?;
 

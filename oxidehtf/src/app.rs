@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::common::*;
+use crate::{common::*, TestSuiteInventory};
 use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::{
@@ -43,24 +43,19 @@ pub struct App {
 }
 
 impl App {
-    pub fn new<T: TestLifecycle + 'static + Send>(
-        funcs: Vec<FuncType<T>>,
-        names: Vec<&'static str>,
-        fixture: T,
-    ) -> Result<Self> {
+    pub fn new(inventory: TestSuiteInventory) -> Result<Self> {
         let (action_tx, action_rx) = unbounded_channel();
         let (event_tx, event_rx) = unbounded_channel();
         let (input_tx, input_rx) = unbounded_channel();
 
-        let suite_data = SuiteData::new(names, event_tx.clone());
+        let suite_data = SuiteData::new(inventory.names.clone(), event_tx.clone());
 
         let context = SysContext::new(suite_data.clone(), event_tx.clone(), input_rx);
         let test_runner = TestRunner::new(
-            funcs,
+            inventory.executer,
             suite_data.clone(),
             event_tx.clone(),
             context,
-            fixture,
         );
 
         let running_tests_screen: Vec<Box<dyn Component>> = vec![

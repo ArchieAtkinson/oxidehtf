@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::common::*;
@@ -18,25 +17,32 @@ pub use lifecycle::TestLifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
-trait SuiteTestExecuter: Send {
+pub trait SuiteTestExecuter: 'static + Send + Sync {
     fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure>;
 
     fn fixture(&mut self) -> &mut dyn TestLifecycle;
+
+    fn fixture_init(&mut self);
 }
 
 #[derive(Debug, Clone)]
 pub struct FunctionsAndFixture<T: TestLifecycle + Send> {
     pub functions: Vec<FuncType<T>>,
-    pub fixture: T,
+    pub fixture: Option<T>,
+    pub fixture_init: fn() -> T,
 }
 
 impl<T: TestLifecycle + Send> SuiteTestExecuter for FunctionsAndFixture<T> {
     fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure> {
-        self.functions[index](context, &mut self.fixture)
+        self.functions[index](context, &mut self.fixture.as_mut().unwrap())
     }
 
     fn fixture(&mut self) -> &mut dyn TestLifecycle {
-        &mut self.fixture
+        self.fixture.as_mut().unwrap()
+    }
+
+    fn fixture_init(&mut self) {
+        self.fixture = Some((self.fixture_init)())
     }
 }
 
@@ -46,22 +52,37 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    pub fn new<T: TestLifecycle + 'static + Send>(
-        funcs: Vec<FuncType<T>>,
-        data: SuiteData,
-        fixture: T,
-    ) -> Self {
-        let funcs_n_fixture = FunctionsAndFixture {
-            functions: funcs,
-            fixture,
-        };
+    pub fn new(executer: Box<dyn SuiteTestExecuter>, data: SuiteData) -> Self {
+        Self { executer, data }
+    }
+}
 
+pub struct TestSuiteInventoryFactory {
+    pub func: fn() -> TestSuiteInventory,
+}
+pub struct TestSuiteInventory {
+    pub executer: Box<dyn SuiteTestExecuter>,
+    pub names: Vec<&'static str>,
+}
+
+impl TestSuiteInventory {
+    pub fn new<T: TestLifecycle>(
+        funcs: Vec<FuncType<T>>,
+        fixture_init: fn() -> T,
+        names: Vec<&'static str>,
+    ) -> Self {
         Self {
-            executer: Box::new(funcs_n_fixture),
-            data,
+            executer: Box::new(FunctionsAndFixture {
+                functions: funcs,
+                fixture: None,
+                fixture_init,
+            }),
+            names,
         }
     }
 }
+
+inventory::collect!(TestSuiteInventoryFactory);
 
 pub struct TestRunner {
     suite: TestSuite,
@@ -70,15 +91,14 @@ pub struct TestRunner {
 }
 
 impl TestRunner {
-    pub fn new<T: TestLifecycle + 'static + Send>(
-        funcs: Vec<FuncType<T>>,
+    pub fn new(
+        executer: Box<dyn SuiteTestExecuter>,
         data: SuiteData,
         event_tx: UnboundedSender<Event>,
         context: SysContext,
-        fixture: T,
     ) -> Self {
         Self {
-            suite: TestSuite::new(funcs, data, fixture),
+            suite: TestSuite::new(executer, data),
             event_tx,
             context,
         }
@@ -86,6 +106,9 @@ impl TestRunner {
 
     pub fn run(&mut self) -> Result<()> {
         info!("Starting Test Runner");
+
+        self.suite.executer.fixture_init();
+
         self.suite.data.set_suite_start_time()?;
 
         self.suite.executer.fixture().setup()?;

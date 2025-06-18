@@ -1,11 +1,19 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemMod, Visibility, parse_macro_input, token};
+use syn::{ItemFn, ItemMod, ReturnType, Type, Visibility, parse_macro_input, token};
+
+enum FuncKind {
+    None,
+    Test,
+    FixtureInit,
+}
 
 #[proc_macro_attribute]
 pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as ItemMod);
 
+    let mut fixture_init: Option<ItemFn> = None;
+    // let mut fixture_type: Option<Box<Type>> = None;
     let mod_name = &input.ident;
     let mut test_functions_pointers = Vec::new();
     let mut test_functions_names = Vec::new();
@@ -14,26 +22,41 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
     if let Some((brace, items)) = input.content.take() {
         for item in items {
             if let syn::Item::Fn(mut func) = item {
-                let mut is_test_fn = false;
+                let mut func_kind = FuncKind::None;
 
                 // Filter out the #[test] attribute
                 func.attrs.retain(|attr| {
                     if attr.path().is_ident("test") {
-                        is_test_fn = true;
-                        false // Remove this attribute
+                        func_kind = FuncKind::Test;
+                        false
+                    } else if attr.path().is_ident("fixture") {
+                        func_kind = FuncKind::FixtureInit;
+                        false
                     } else {
-                        true // Keep other attributes
+                        true
                     }
                 });
 
-                if is_test_fn {
-                    // Make the function public as main is outside of test mod
-                    func.vis = Visibility::Public(token::Pub::default());
-                    let func_name = &func.sig.ident;
-                    test_functions_pointers.push(quote! { #mod_name::#func_name});
-                    test_functions_names.push(quote! {stringify!(#func_name)});
+                match func_kind {
+                    FuncKind::Test => {
+                        func.vis = Visibility::Public(token::Pub::default());
+                        let func_name = &func.sig.ident;
+                        test_functions_pointers.push(quote! { #mod_name::#func_name});
+                        test_functions_names.push(quote! {stringify!(#func_name)});
+                        processed_items.push(syn::Item::Fn(func));
+                    }
+                    FuncKind::FixtureInit => {
+                        func.vis = Visibility::Public(token::Pub::default());
+                        fixture_init = Some(func.clone());
+                        // fixture_type = match &func.sig.output {
+                        //     ReturnType::Default => None,
+                        //     ReturnType::Type(.., ty) => Some(ty.clone()),
+                        // };
+
+                        processed_items.push(syn::Item::Fn(func));
+                    }
+                    _ => (),
                 }
-                processed_items.push(syn::Item::Fn(func)); // Add the modified function
             } else {
                 processed_items.push(item); // Add other items as is
             }
@@ -41,19 +64,31 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
         input.content = Some((brace, processed_items));
     }
 
+    let fixture_init_ident = if let Some(fixture_init) = fixture_init {
+        let sig = fixture_init.sig.ident;
+        Some(quote!(#sig))
+    } else {
+        None
+    };
+
+    eprintln!("{:?}", fixture_init_ident);
+
     let expanded = quote! {
-        #input // This now contains the module with #[test] attributes removed and functions made public
+        #input
+
+        fn create_suite_inventory() -> oxidehtf::TestSuiteInventory {
+            oxidehtf::TestSuiteInventory::new(
+                vec![#(#test_functions_pointers),*],
+                crate::#mod_name::#fixture_init_ident,
+                vec![#(#test_functions_names),*])
+        }
+
+        inventory::submit!{
+            oxidehtf::TestSuiteInventoryFactory {func: create_suite_inventory}
+        }
 
         fn main() -> color_eyre::eyre::Result<()> {
-
-            use crate::#mod_name::Fixture;
-
-            let context = Fixture::default();
-            oxidehtf::run_tests(
-                vec![#(#test_functions_pointers),*],
-                vec![#(#test_functions_names),*],
-                context)
-
+            oxidehtf::run_tests()
         }
     };
 

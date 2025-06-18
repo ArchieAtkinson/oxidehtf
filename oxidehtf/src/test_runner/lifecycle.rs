@@ -1,6 +1,6 @@
 use crate::common::*;
 
-pub trait TestLifecycle {
+pub trait TestLifecycle: 'static + Send + Sync {
     fn setup(&mut self) -> Result<()> {
         Ok(())
     }

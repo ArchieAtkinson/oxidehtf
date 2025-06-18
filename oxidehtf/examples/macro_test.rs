@@ -6,10 +6,13 @@ mod tests {
     use color_eyre::eyre::Result;
     use oxidehtf::{SysContext, TestLifecycle};
 
-    #[derive(Default)]
     pub struct Fixture {}
-
     impl TestLifecycle for Fixture {}
+
+    #[fixture]
+    fn fixture() -> Fixture {
+        Fixture {}
+    }
 
     #[test]
     fn test1(
