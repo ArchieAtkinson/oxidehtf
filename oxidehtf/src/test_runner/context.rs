@@ -2,7 +2,9 @@ use dut::Dut;
 use measurement::Measurements;
 use user_text_input::TextInput;
 
-use crate::{common::*, test_runner::SuiteData};
+use crate::common::*;
+
+use super::data::suite::SuiteDataCollection;
 
 pub mod dut;
 pub mod measurement;
@@ -16,7 +18,7 @@ pub struct SysContext {
 
 impl SysContext {
     pub fn new(
-        suite_data: SuiteData,
+        suite_data: SuiteDataCollection,
         event_tx: UnboundedSender<Event>,
         action_rx: broadcast::Receiver<Action>,
     ) -> Self {

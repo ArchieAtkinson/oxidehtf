@@ -13,8 +13,8 @@ pub use test_runner::context::measurement::Unit;
 pub use test_runner::SysContext;
 pub use test_runner::TestFailure;
 pub use test_runner::TestLifecycle;
-pub use test_runner::TestSuiteInventory;
-pub use test_runner::TestSuiteInventoryFactory;
+pub use test_runner::TestSuiteBuilder;
+pub use test_runner::TestSuiteBuilderProducer;
 
 #[macro_export]
 macro_rules! assert_eq {
@@ -51,15 +51,8 @@ pub fn run_tests() -> Result<()> {
 
     info!("Starting");
 
-    let factory = inventory::iter::<TestSuiteInventoryFactory>
-        .into_iter()
-        .nth(0)
-        .unwrap();
-
-    let suite = (factory.func)();
-
     rt.block_on(async move {
-        let mut app = app::App::new(suite)?;
+        let mut app = app::App::new()?;
         app.run().await
     })?;
 

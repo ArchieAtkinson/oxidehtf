@@ -10,10 +10,16 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone)]
-pub struct SuiteData {
-    inner: Arc<RwLock<SuiteDataRaw>>,
-    event_tx: UnboundedSender<Event>,
-    current_test: CurrentTestData,
+pub struct SuiteDataCollectionHolder {
+    pub inner: Arc<RwLock<Vec<SuiteDataRaw>>>,
+    pub current: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SuiteDataCollection {
+    pub data: SuiteDataCollectionHolder,
+    pub event_tx: UnboundedSender<Event>,
+    pub current_test: CurrentTestData,
 }
 
 #[derive(Debug, Clone)]
@@ -24,29 +30,19 @@ pub struct SuiteDataRaw {
     pub current_index: usize,
 }
 
-impl SuiteData {
-    pub fn new(names: Vec<&'static str>, event_tx: UnboundedSender<Event>) -> Self {
-        let test_data = SuiteDataRaw {
-            test_metadata: names
-                .iter()
-                .map(|n| TestData {
-                    name: *n,
-                    state: TestState::InQueue,
-                    user_data: IndexMap::new(),
-                    duration: Duration::default(),
-                })
-                .collect(),
-            current_index: 0,
-            dut_id: String::new(),
-            start_time: Default::default(),
+impl SuiteDataCollection {
+    pub fn new(suites_data: Vec<SuiteDataRaw>, event_tx: UnboundedSender<Event>) -> Self {
+        let data = Arc::new(RwLock::new(suites_data));
+
+        let collection_holder = SuiteDataCollectionHolder {
+            inner: data.clone(),
+            current: 0,
         };
 
-        let inner = Arc::new(RwLock::new(test_data));
-
         Self {
-            inner: inner.clone(),
+            data: collection_holder.clone(),
             event_tx: event_tx.clone(),
-            current_test: CurrentTestData::new(inner.clone(), event_tx.clone()),
+            current_test: CurrentTestData::new(collection_holder.clone(), event_tx.clone()),
         }
     }
 
@@ -67,35 +63,52 @@ impl SuiteData {
     }
 
     pub fn set_suite_start_time(&self) -> Result<()> {
-        blocking_write(&self.inner, &self.event_tx, |d| {
+        blocking_write(&self.data, &self.event_tx, |d| {
             let fixed_offset = FixedOffset::west_opt(0).unwrap();
-            d.start_time = Utc::now().with_timezone(&fixed_offset);
+            d[self.data.current].start_time = Utc::now().with_timezone(&fixed_offset);
             Ok(())
         })
     }
 
     pub fn number_of_tests(&self) -> Result<usize> {
-        blocking_read(&self.inner, |d| Ok(d.test_metadata.len()))
+        blocking_read(&self.data, |d| Ok(d[self.data.current].test_metadata.len()))
     }
 
     pub fn set_dut_id(&self, id: impl Into<String>) {
-        blocking_write(&self.inner, &self.event_tx, |d| {
-            d.dut_id = id.into();
+        blocking_write(&self.data, &self.event_tx, |d| {
+            d[self.data.current].dut_id = id.into();
             Ok(())
         })
         .unwrap();
     }
 
     pub fn blocking_get_raw_copy(&self) -> SuiteDataRaw {
-        self.inner.blocking_read().clone()
+        self.data.inner.blocking_read()[self.data.current].clone()
     }
 
     pub async fn get_raw_copy(&self) -> SuiteDataRaw {
-        self.inner.read().await.clone()
+        self.data.inner.read().await[self.data.current].clone()
     }
 }
 
 impl SuiteDataRaw {
+    pub fn new(names: Vec<&'static str>) -> Self {
+        Self {
+            test_metadata: names
+                .iter()
+                .map(|n| TestData {
+                    name: *n,
+                    state: TestState::InQueue,
+                    user_data: IndexMap::new(),
+                    duration: Duration::default(),
+                })
+                .collect(),
+            current_index: 0,
+            dut_id: String::new(),
+            start_time: Default::default(),
+        }
+    }
+
     pub fn current_test(&self) -> &TestData {
         let current_index = self.current_index;
         self.test_metadata

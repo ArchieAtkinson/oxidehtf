@@ -5,87 +5,48 @@ use crate::common::*;
 pub mod context;
 pub mod data;
 pub mod errors;
+pub mod executer;
 pub mod lifecycle;
 
 pub use context::measurement::MeasurementDefinition;
 pub use context::SysContext;
 pub use data::current_test::CurrentTestData;
-pub use data::suite::{SuiteData, SuiteDataRaw};
+use data::suite::SuiteDataCollection;
+pub use data::suite::SuiteDataRaw;
 pub use data::{TestDone, TestRunning, TestState};
 pub use errors::TestFailure;
+pub use executer::SuiteExecuter;
+pub use executer::SuiteExecuterHolder;
 pub use lifecycle::TestLifecycle;
 
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
-pub trait SuiteTestExecuter: 'static + Send + Sync {
-    fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure>;
-
-    fn fixture(&mut self) -> &mut dyn TestLifecycle;
-
-    fn fixture_init(&mut self);
+pub struct TestSuiteBuilderProducer {
+    pub func: fn() -> TestSuiteBuilder,
+}
+pub struct TestSuiteBuilder {
+    pub executer: Box<dyn SuiteExecuter>,
+    pub data: SuiteDataRaw,
 }
 
-#[derive(Debug, Clone)]
-pub struct FunctionsAndFixture<T: TestLifecycle + Send> {
-    pub functions: Vec<FuncType<T>>,
-    pub fixture: Option<T>,
-    pub fixture_init: fn() -> T,
-}
-
-impl<T: TestLifecycle + Send> SuiteTestExecuter for FunctionsAndFixture<T> {
-    fn run_test(&mut self, index: usize, context: &mut SysContext) -> Result<(), TestFailure> {
-        self.functions[index](context, &mut self.fixture.as_mut().unwrap())
-    }
-
-    fn fixture(&mut self) -> &mut dyn TestLifecycle {
-        self.fixture.as_mut().unwrap()
-    }
-
-    fn fixture_init(&mut self) {
-        self.fixture = Some((self.fixture_init)())
-    }
-}
-
-pub struct TestSuite {
-    executer: Box<dyn SuiteTestExecuter>,
-    data: SuiteData,
-}
-
-impl TestSuite {
-    pub fn new(executer: Box<dyn SuiteTestExecuter>, data: SuiteData) -> Self {
-        Self { executer, data }
-    }
-}
-
-pub struct TestSuiteInventoryFactory {
-    pub func: fn() -> TestSuiteInventory,
-}
-pub struct TestSuiteInventory {
-    pub executer: Box<dyn SuiteTestExecuter>,
-    pub names: Vec<&'static str>,
-}
-
-impl TestSuiteInventory {
+impl TestSuiteBuilder {
     pub fn new<T: TestLifecycle>(
         funcs: Vec<FuncType<T>>,
         fixture_init: fn() -> T,
         names: Vec<&'static str>,
     ) -> Self {
         Self {
-            executer: Box::new(FunctionsAndFixture {
-                functions: funcs,
-                fixture: None,
-                fixture_init,
-            }),
-            names,
+            executer: Box::new(SuiteExecuterHolder::new(funcs, fixture_init)),
+            data: SuiteDataRaw::new(names),
         }
     }
 }
 
-inventory::collect!(TestSuiteInventoryFactory);
+inventory::collect!(TestSuiteBuilderProducer);
 
 pub struct TestRunner {
-    suite: TestSuite,
+    executor: Vec<Box<dyn SuiteExecuter>>,
+    data: SuiteDataCollection,
     event_tx: UnboundedSender<Event>,
     action_rx: broadcast::Receiver<Action>,
     context: SysContext,
@@ -93,13 +54,14 @@ pub struct TestRunner {
 
 impl TestRunner {
     pub fn new(
-        executer: Box<dyn SuiteTestExecuter>,
-        data: SuiteData,
+        executor: Vec<Box<dyn SuiteExecuter>>,
+        data: SuiteDataCollection,
         event_tx: UnboundedSender<Event>,
         action_tx: broadcast::Sender<Action>,
     ) -> Self {
         Self {
-            suite: TestSuite::new(executer, data.clone()),
+            executor,
+            data: data.clone(),
             event_tx: event_tx.clone(),
             action_rx: action_tx.subscribe(),
             context: SysContext::new(data.clone(), event_tx, action_tx.subscribe()),
@@ -115,27 +77,31 @@ impl TestRunner {
                     Action::StartTests => break,
                     _ => (),
                 }
+            } else {
+                return Err(eyre!("Failed to start tests"));
             }
         }
 
         info!("Starting Tests");
 
-        self.suite.executer.fixture_init();
+        let suite_index = self.data.data.current;
 
-        self.suite.data.set_suite_start_time()?;
+        self.executor[suite_index].fixture_init();
 
-        self.suite.executer.fixture().setup()?;
+        self.data.set_suite_start_time()?;
 
-        for (index, data) in self.suite.data.current_testdata_iter().enumerate() {
+        self.executor[suite_index].fixture().setup()?;
+
+        for (index, data) in self.data.current_testdata_iter().enumerate() {
             data.set_state(TestState::Running(TestRunning::Running))?;
 
-            self.suite.executer.fixture().before_test()?;
+            self.executor[suite_index].fixture().before_test()?;
 
             let start_time = Instant::now();
-            let result = self.suite.executer.run_test(index, &mut self.context);
+            let result = self.executor[suite_index].run_test(index, &mut self.context);
             let test_duration = Instant::now() - start_time;
 
-            self.suite.executer.fixture().after_test()?;
+            self.executor[suite_index].fixture().after_test()?;
 
             let final_state = match result {
                 Ok(_) => TestState::Done(TestDone::Passed),
@@ -148,7 +114,7 @@ impl TestRunner {
 
         self.event_tx.send(Event::TestsCompleted)?;
 
-        self.suite.executer.fixture().teardown()?;
+        self.executor[suite_index].fixture().teardown()?;
 
         info!("Done");
 

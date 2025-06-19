@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use indexmap::IndexMap;
-use suite::SuiteDataRaw;
+use suite::{SuiteDataCollectionHolder, SuiteDataRaw};
 
 pub mod current_test;
 pub mod suite;
@@ -40,25 +40,25 @@ pub struct TestData {
 }
 
 fn blocking_write<F, R>(
-    inner: &Arc<RwLock<SuiteDataRaw>>,
+    inner: &SuiteDataCollectionHolder,
     tx: &UnboundedSender<Event>,
     f: F,
 ) -> Result<R>
 where
-    F: FnOnce(&mut SuiteDataRaw) -> Result<R>,
+    F: FnOnce(&mut Vec<SuiteDataRaw>) -> Result<R>,
 {
-    let mut data_guard = inner.blocking_write();
+    let mut data_guard = inner.inner.blocking_write();
     let result = f(&mut data_guard);
     drop(data_guard);
     tx.send(Event::UpdatedTestData)?;
     result
 }
 
-fn blocking_read<F, R>(inner: &Arc<RwLock<SuiteDataRaw>>, f: F) -> Result<R>
+fn blocking_read<F, R>(inner: &SuiteDataCollectionHolder, f: F) -> Result<R>
 where
-    F: FnOnce(&SuiteDataRaw) -> Result<R>,
+    F: FnOnce(&Vec<SuiteDataRaw>) -> Result<R>,
 {
-    let mut data_guard = inner.blocking_read();
+    let mut data_guard = inner.inner.blocking_read();
     let result = f(&mut data_guard);
     drop(data_guard);
     result

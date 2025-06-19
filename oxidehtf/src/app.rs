@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{common::*, TestSuiteInventory};
+use crate::{
+    common::*,
+    test_runner::{data::suite::SuiteDataCollection, SuiteDataRaw, SuiteExecuter},
+    TestSuiteBuilderProducer,
+};
 use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::{
@@ -8,7 +12,7 @@ use crate::{
         CompletedTestDisplay, Component, CurrentTestDisplay, SuiteProgressDisplay, UserTextInput,
         WaitingTestDisplay, WeclomeDisplay,
     },
-    test_runner::{SuiteData, TestDone, TestRunner, TestState},
+    test_runner::{TestDone, TestRunner, TestState},
     ui::Ui,
 };
 
@@ -29,7 +33,7 @@ pub enum Screen {
 pub struct App {
     ui: Ui,
     state: AppState,
-    suite_data: SuiteData,
+    suites_data: SuiteDataCollection,
     components: HashMap<Screen, Vec<Box<dyn Component>>>,
     test_runner: Option<TestRunner>,
     current_focus: usize,
@@ -41,15 +45,24 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(inventory: TestSuiteInventory) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let (event_tx, event_rx) = unbounded_channel();
         let (action_tx, action_rx) = broadcast::channel(16);
 
-        let suite_data = SuiteData::new(inventory.names.clone(), event_tx.clone());
+        let (data, executors): (Vec<SuiteDataRaw>, Vec<Box<dyn SuiteExecuter>>) =
+            inventory::iter::<TestSuiteBuilderProducer>
+                .into_iter()
+                .map(|f| ((*f).func)())
+                .map(|f| (f.data, f.executer))
+                .collect();
+
+        info!("{}", data.len());
+
+        let suites_collection = SuiteDataCollection::new(data, event_tx.clone());
 
         let test_runner = TestRunner::new(
-            inventory.executer,
-            suite_data.clone(),
+            executors,
+            suites_collection.clone(),
             event_tx.clone(),
             action_tx.clone(),
         );
@@ -67,7 +80,7 @@ impl App {
 
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
-            suite_data,
+            suites_data: suites_collection,
             components: HashMap::from([
                 (Screen::RunningTests, running_tests_screen),
                 (Screen::Welcome, welcome_screen),
@@ -98,7 +111,7 @@ impl App {
         let current_focus = self.current_focus;
         self.active_components()?[current_focus].focus();
 
-        let state = self.suite_data.get_raw_copy().await;
+        let state = self.suites_data.get_raw_copy().await;
         self.ui.render(|f, a| {
             for component in self
                 .components
@@ -114,7 +127,7 @@ impl App {
         while self.state() != AppState::Done {
             self.handle_event().await?;
             self.handle_actions().await?;
-            let state = self.suite_data.get_raw_copy().await;
+            let state = self.suites_data.get_raw_copy().await;
             self.ui.render(|f, a| {
                 for component in self
                     .components
@@ -142,7 +155,7 @@ impl App {
             }
         }
 
-        Self::produce_junit_report(&self.suite_data).await?;
+        Self::produce_junit_report(&self.suites_data).await?;
 
         Ok(())
     }
@@ -289,7 +302,7 @@ impl App {
         Ok(())
     }
 
-    async fn produce_junit_report(data: &SuiteData) -> Result<()> {
+    async fn produce_junit_report(data: &SuiteDataCollection) -> Result<()> {
         use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
         let mut report = Report::new("htf2-run");

@@ -68,8 +68,8 @@ fn test2_with_longer_name(
     Ok(())
 }
 
-fn create_suite_inventory() -> oxidehtf::TestSuiteInventory {
-    oxidehtf::TestSuiteInventory::new(
+fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
+    oxidehtf::TestSuiteBuilder::new(
         vec![test1, test2_with_longer_name],
         fixture,
         vec!["test1", "test2"],
@@ -77,7 +77,7 @@ fn create_suite_inventory() -> oxidehtf::TestSuiteInventory {
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteInventoryFactory {func: create_suite_inventory}
+    oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
 }
 
 fn main() -> Result<()> {

@@ -1,13 +1,13 @@
-use crate::test_runner::SuiteData;
+use crate::test_runner::data::suite::SuiteDataCollection;
 
 use super::user_text_input::TextInput;
 
 pub struct Dut {
-    suite_data: SuiteData,
+    suite_data: SuiteDataCollection,
 }
 
 impl Dut {
-    pub fn new(test_data: SuiteData) -> Self {
+    pub fn new(test_data: SuiteDataCollection) -> Self {
         Self {
             suite_data: test_data,
         }

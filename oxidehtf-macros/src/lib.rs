@@ -76,15 +76,15 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #input
 
-        fn create_suite_inventory() -> oxidehtf::TestSuiteInventory {
-            oxidehtf::TestSuiteInventory::new(
+        fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
+            oxidehtf::TestSuiteBuilder::new(
                 vec![#(#test_functions_pointers),*],
                 crate::#mod_name::#fixture_init_ident,
                 vec![#(#test_functions_names),*])
         }
 
         inventory::submit!{
-            oxidehtf::TestSuiteInventoryFactory {func: create_suite_inventory}
+            oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
         }
 
         fn main() -> color_eyre::eyre::Result<()> {
