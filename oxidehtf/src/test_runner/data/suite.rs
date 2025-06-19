@@ -11,13 +11,13 @@ use indexmap::IndexMap;
 
 #[derive(Debug, Clone)]
 pub struct SuiteDataCollectionHolder {
-    pub inner: Arc<RwLock<Vec<SuiteDataRaw>>>,
+    pub inner: Vec<SuiteDataRaw>,
     pub current: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct SuiteDataCollection {
-    pub data: SuiteDataCollectionHolder,
+    pub data: Arc<RwLock<SuiteDataCollectionHolder>>,
     pub event_tx: UnboundedSender<Event>,
     pub current_test: CurrentTestData,
 }
@@ -32,12 +32,10 @@ pub struct SuiteDataRaw {
 
 impl SuiteDataCollection {
     pub fn new(suites_data: Vec<SuiteDataRaw>, event_tx: UnboundedSender<Event>) -> Self {
-        let data = Arc::new(RwLock::new(suites_data));
-
-        let collection_holder = SuiteDataCollectionHolder {
-            inner: data.clone(),
+        let collection_holder = Arc::new(RwLock::new(SuiteDataCollectionHolder {
+            inner: suites_data,
             current: 0,
-        };
+        }));
 
         Self {
             data: collection_holder.clone(),
@@ -65,29 +63,30 @@ impl SuiteDataCollection {
     pub fn set_suite_start_time(&self) -> Result<()> {
         blocking_write(&self.data, &self.event_tx, |d| {
             let fixed_offset = FixedOffset::west_opt(0).unwrap();
-            d[self.data.current].start_time = Utc::now().with_timezone(&fixed_offset);
+            d.inner[d.current].start_time = Utc::now().with_timezone(&fixed_offset);
             Ok(())
         })
     }
 
     pub fn number_of_tests(&self) -> Result<usize> {
-        blocking_read(&self.data, |d| Ok(d[self.data.current].test_metadata.len()))
+        blocking_read(&self.data, |d| Ok(d.inner[d.current].test_metadata.len()))
     }
 
     pub fn set_dut_id(&self, id: impl Into<String>) {
         blocking_write(&self.data, &self.event_tx, |d| {
-            d[self.data.current].dut_id = id.into();
+            d.inner[d.current].dut_id = id.into();
             Ok(())
         })
         .unwrap();
     }
 
     pub fn blocking_get_raw_copy(&self) -> SuiteDataRaw {
-        self.data.inner.blocking_read()[self.data.current].clone()
+        blocking_read(&self.data, |d| Ok(d.inner[d.current].clone())).unwrap()
     }
 
     pub async fn get_raw_copy(&self) -> SuiteDataRaw {
-        self.data.inner.read().await[self.data.current].clone()
+        let index = self.data.read().await.current;
+        self.data.read().await.inner[index].clone()
     }
 }
 

@@ -6,39 +6,42 @@ use crate::{common::*, test_runner::MeasurementDefinition};
 
 #[derive(Debug, Clone)]
 pub struct CurrentTestData {
-    inner: SuiteDataCollectionHolder,
+    inner: Arc<RwLock<SuiteDataCollectionHolder>>,
     event_tx: UnboundedSender<Event>,
 }
 
 impl CurrentTestData {
-    pub fn new(inner: SuiteDataCollectionHolder, event_tx: UnboundedSender<Event>) -> Self {
+    pub fn new(
+        inner: Arc<RwLock<SuiteDataCollectionHolder>>,
+        event_tx: UnboundedSender<Event>,
+    ) -> Self {
         Self { inner, event_tx }
     }
 
     pub fn update_test_index(&self, index: usize) -> Result<()> {
         blocking_write(&self.inner, &self.event_tx, |d| {
-            d[self.inner.current].current_index = index;
+            d.inner[d.current].current_index = index;
             Ok(())
         })
     }
 
     pub fn set_state(&self, state: TestState) -> Result<()> {
         blocking_write(&self.inner, &self.event_tx, |d| {
-            d[self.inner.current].current_test_mut().state = state;
+            d.inner[d.current].current_test_mut().state = state;
             Ok(())
         })
     }
 
     pub fn set_test_duration(&self, duration: Duration) -> Result<()> {
         blocking_write(&self.inner, &self.event_tx, |d| {
-            d[self.inner.current].current_test_mut().duration = duration;
+            d.inner[d.current].current_test_mut().duration = duration;
             Ok(())
         })
     }
 
     pub fn insert_measurement(&self, name: &str, def: MeasurementDefinition) -> Result<()> {
         blocking_write(&self.inner, &self.event_tx, |d| {
-            d[self.inner.current]
+            d.inner[d.current]
                 .current_test_mut()
                 .user_data
                 .insert(name.into(), def.clone());

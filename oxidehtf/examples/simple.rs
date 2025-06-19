@@ -16,20 +16,13 @@ fn fixture() -> Fixture {
 fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
     info!("Running Test1");
 
-    // context.dut.set_via_operator(&mut context.text_input);
+    context.dut.set_via_operator(&mut context.text_input);
 
-    // let input = context.text_input.request("The answer is 'Test'");
+    let input = context.text_input.request("The answer is 'Test'");
 
-    // info!("{}", input);
+    info!("{}", input);
 
-    // oxidehtf::assert_eq!(input, "Test");
-
-    // context
-    //      .measurements
-    //      .measure("First Input Value")
-    //      .set_str(&input)?;
-
-    // std::thread::sleep(Duration::from_secs(1));
+    oxidehtf::assert_eq!(input, "Test");
 
     context
         .measurements
@@ -44,9 +37,8 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxideht
             .measure(format!("Measurement {i}"))
             .set_str(format!("Value {i}"))?;
     }
-    let input = context.text_input.request("Second Prompt");
 
-    // std::thread::sleep(Duration::from_secs(2));
+    let input = context.text_input.request("Second Prompt");
 
     info!("{}", input);
 
@@ -74,6 +66,10 @@ fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
         fixture,
         vec!["test1", "test2"],
     )
+}
+
+inventory::submit! {
+    oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
 }
 
 inventory::submit! {

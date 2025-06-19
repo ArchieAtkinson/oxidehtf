@@ -82,42 +82,46 @@ impl TestRunner {
             }
         }
 
-        info!("Starting Tests");
+        let suite_num = self.data.data.blocking_read().inner.len();
+        for suite_index in 0..suite_num {
+            info!("Starting Suite: {}", suite_index);
 
-        let suite_index = self.data.data.current;
+            self.data.data.blocking_write().current = suite_index;
 
-        self.executor[suite_index].fixture_init();
+            self.executor[suite_index].fixture_init();
 
-        self.data.set_suite_start_time()?;
+            self.data.set_suite_start_time()?;
 
-        self.executor[suite_index].fixture().setup()?;
+            self.executor[suite_index].fixture().setup()?;
 
-        for (index, data) in self.data.current_testdata_iter().enumerate() {
-            data.set_state(TestState::Running(TestRunning::Running))?;
+            for (index, data) in self.data.current_testdata_iter().enumerate() {
+                info!("Starting Test: {}", index);
 
-            self.executor[suite_index].fixture().before_test()?;
+                data.set_state(TestState::Running(TestRunning::Running))?;
 
-            let start_time = Instant::now();
-            let result = self.executor[suite_index].run_test(index, &mut self.context);
-            let test_duration = Instant::now() - start_time;
+                self.executor[suite_index].fixture().before_test()?;
 
-            self.executor[suite_index].fixture().after_test()?;
+                let start_time = Instant::now();
+                let result = self.executor[suite_index].run_test(index, &mut self.context);
+                let test_duration = Instant::now() - start_time;
 
-            let final_state = match result {
-                Ok(_) => TestState::Done(TestDone::Passed),
-                Err(_) => TestState::Done(TestDone::Failed),
-            };
+                self.executor[suite_index].fixture().after_test()?;
 
-            data.set_state(final_state)?;
-            data.set_test_duration(test_duration)?;
+                let final_state = match result {
+                    Ok(_) => TestState::Done(TestDone::Passed),
+                    Err(_) => TestState::Done(TestDone::Failed),
+                };
+
+                data.set_state(final_state)?;
+                data.set_test_duration(test_duration)?;
+            }
+
+            self.event_tx.send(Event::TestsCompleted)?;
+
+            self.executor[suite_index].fixture().teardown()?;
+
+            info!("Done");
         }
-
-        self.event_tx.send(Event::TestsCompleted)?;
-
-        self.executor[suite_index].fixture().teardown()?;
-
-        info!("Done");
-
         Ok(())
     }
 }
