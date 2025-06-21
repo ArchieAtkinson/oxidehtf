@@ -15,4 +15,5 @@ pub enum Action {
     UserKeyInputRequest(InputRequest),
     ChangeScreen(Screen),
     StartTests,
+    SetCurrentSuiteDut(String),
 }

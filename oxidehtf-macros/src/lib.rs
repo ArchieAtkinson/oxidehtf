@@ -13,7 +13,6 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as ItemMod);
 
     let mut fixture_init: Option<ItemFn> = None;
-    // let mut fixture_type: Option<Box<Type>> = None;
     let mod_name = &input.ident;
     let mut test_functions_pointers = Vec::new();
     let mut test_functions_names = Vec::new();
@@ -41,7 +40,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     FuncKind::Test => {
                         func.vis = Visibility::Public(token::Pub::default());
                         let func_name = &func.sig.ident;
-                        test_functions_pointers.push(quote! { #mod_name::#func_name});
+                        test_functions_pointers.push(quote! { #func_name});
                         test_functions_names.push(quote! {stringify!(#func_name)});
                         processed_items.push(syn::Item::Fn(func));
                     }
@@ -71,26 +70,44 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
         None
     };
 
-    eprintln!("{:?}", fixture_init_ident);
-
-    let expanded = quote! {
-        #input
-
+    let register = quote! {
         fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
             oxidehtf::TestSuiteBuilder::new(
                 vec![#(#test_functions_pointers),*],
                 crate::#mod_name::#fixture_init_ident,
-                vec![#(#test_functions_names),*])
+                vec![#(#test_functions_names),*],
+                stringify!(#mod_name))
         }
 
         inventory::submit!{
             oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
         }
 
-        fn main() -> color_eyre::eyre::Result<()> {
-            oxidehtf::run_tests()
-        }
     };
 
-    expanded.into()
+    struct ItemsParser {
+        items: Vec<syn::Item>,
+    }
+
+    impl syn::parse::Parse for ItemsParser {
+        fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+            let mut items = Vec::new();
+            while !input.is_empty() {
+                items.push(input.parse()?);
+            }
+            Ok(ItemsParser { items })
+        }
+    }
+
+    let parsed_items_wrapper: ItemsParser =
+        syn::parse2(register).expect("Failed to parse TokenStream into multiple Items");
+
+    input
+        .content
+        .as_mut()
+        .expect("Content should be present")
+        .1
+        .extend(parsed_items_wrapper.items);
+
+    quote! {#input}.into()
 }

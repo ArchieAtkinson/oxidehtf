@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     common::*,
-    test_runner::{data::suite::SuiteDataCollection, SuiteDataRaw, SuiteExecuter},
+    test_runner::{
+        data::{suite::SuiteDataCollection, write},
+        SuiteDataRaw, SuiteExecuter,
+    },
     TestSuiteBuilderProducer,
 };
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -155,7 +158,7 @@ impl App {
             }
         }
 
-        Self::produce_junit_report(&self.suites_data).await?;
+        self.produce_junit_report().await?;
 
         Ok(())
     }
@@ -208,6 +211,13 @@ impl App {
                     }
                     self.current_screen = s;
                     self.focus_default()?;
+                }
+                SetCurrentSuiteDut(s) => {
+                    write(&self.suites_data.data, &self.event_tx, |d| {
+                        d.inner[d.current].dut_id = s;
+                        Ok(())
+                    })
+                    .await?
                 }
                 _ => (),
             }
@@ -302,30 +312,31 @@ impl App {
         Ok(())
     }
 
-    async fn produce_junit_report(data: &SuiteDataCollection) -> Result<()> {
+    async fn produce_junit_report(&self) -> Result<()> {
         use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
         let mut report = Report::new("htf2-run");
-        let mut test_suite = TestSuite::new("htf2-suite");
 
-        let data = data.get_raw_copy().await;
+        for suite in &self.suites_data.data.read().await.inner {
+            let mut test_suite = TestSuite::new(format!("{}", suite.name));
 
-        for test in data.test_metadata {
-            let test_case_result = match test.state {
-                TestState::Done(r) => match r {
-                    TestDone::Passed => TestCaseStatus::success(),
-                    TestDone::Failed => TestCaseStatus::non_success(NonSuccessKind::Failure),
-                },
+            for test in &suite.test_metadata {
+                let test_case_result = match &test.state {
+                    TestState::Done(r) => match r {
+                        TestDone::Passed => TestCaseStatus::success(),
+                        TestDone::Failed => TestCaseStatus::non_success(NonSuccessKind::Failure),
+                    },
 
-                _ => TestCaseStatus::non_success(NonSuccessKind::Error),
-            };
-            let mut test_case = TestCase::new(test.name, test_case_result);
-            test_case.set_time(test.duration);
-            test_suite.add_test_case(test_case);
+                    _ => TestCaseStatus::non_success(NonSuccessKind::Error),
+                };
+                let mut test_case = TestCase::new(test.name, test_case_result);
+                test_case.set_time(test.duration);
+                test_suite.add_test_case(test_case);
+            }
+
+            report.add_test_suite(test_suite);
+            report.timestamp = Some(suite.start_time);
         }
-
-        report.add_test_suite(test_suite);
-        report.timestamp = Some(data.start_time);
 
         let junit_file = std::fs::File::create("junit-report.xml")?;
 

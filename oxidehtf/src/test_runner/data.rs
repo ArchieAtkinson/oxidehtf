@@ -39,7 +39,7 @@ pub struct TestData {
     pub user_data: IndexMap<String, MeasurementDefinition>,
 }
 
-fn blocking_write<F, R>(
+pub fn blocking_write<F, R>(
     inner: &Arc<RwLock<SuiteDataCollectionHolder>>,
     tx: &UnboundedSender<Event>,
     f: F,
@@ -48,6 +48,21 @@ where
     F: FnOnce(&mut SuiteDataCollectionHolder) -> Result<R>,
 {
     let mut data_guard = inner.blocking_write();
+    let result = f(&mut data_guard);
+    drop(data_guard);
+    tx.send(Event::UpdatedTestData)?;
+    result
+}
+
+pub async fn write<F, R>(
+    inner: &Arc<RwLock<SuiteDataCollectionHolder>>,
+    tx: &UnboundedSender<Event>,
+    f: F,
+) -> Result<R>
+where
+    F: FnOnce(&mut SuiteDataCollectionHolder) -> Result<R>,
+{
+    let mut data_guard = inner.write().await;
     let result = f(&mut data_guard);
     drop(data_guard);
     tx.send(Event::UpdatedTestData)?;

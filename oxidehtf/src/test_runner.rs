@@ -34,10 +34,11 @@ impl TestSuiteBuilder {
         funcs: Vec<FuncType<T>>,
         fixture_init: fn() -> T,
         names: Vec<&'static str>,
+        suite_name: &'static str,
     ) -> Self {
         Self {
             executer: Box::new(SuiteExecuterHolder::new(funcs, fixture_init)),
-            data: SuiteDataRaw::new(names),
+            data: SuiteDataRaw::new(names, suite_name),
         }
     }
 }
@@ -64,7 +65,7 @@ impl TestRunner {
             data: data.clone(),
             event_tx: event_tx.clone(),
             action_rx: action_tx.subscribe(),
-            context: SysContext::new(data.clone(), event_tx, action_tx.subscribe()),
+            context: SysContext::new(data.clone(), event_tx, action_tx.clone()),
         }
     }
 
@@ -84,7 +85,10 @@ impl TestRunner {
 
         let suite_num = self.data.data.blocking_read().inner.len();
         for suite_index in 0..suite_num {
-            info!("Starting Suite: {}", suite_index);
+            info!(
+                "Starting Suite: {}",
+                self.data.data.blocking_read().inner[suite_index].name
+            );
 
             self.data.data.blocking_write().current = suite_index;
 
@@ -95,7 +99,7 @@ impl TestRunner {
             self.executor[suite_index].fixture().setup()?;
 
             for (index, data) in self.data.current_testdata_iter().enumerate() {
-                info!("Starting Test: {}", index);
+                info!("Starting Test: {}", data.get_test_name()?);
 
                 data.set_state(TestState::Running(TestRunning::Running))?;
 

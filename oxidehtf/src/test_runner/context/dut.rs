@@ -1,20 +1,20 @@
-use crate::test_runner::data::suite::SuiteDataCollection;
+use crate::common::*;
 
 use super::user_text_input::TextInput;
 
 pub struct Dut {
-    suite_data: SuiteDataCollection,
+    action_tx: broadcast::Sender<Action>,
 }
 
 impl Dut {
-    pub fn new(test_data: SuiteDataCollection) -> Self {
-        Self {
-            suite_data: test_data,
-        }
+    pub fn new(action_tx: broadcast::Sender<Action>) -> Self {
+        Self { action_tx }
     }
 
     pub fn set_id(&self, id: impl Into<String>) {
-        self.suite_data.set_dut_id(id);
+        self.action_tx
+            .send(Action::SetCurrentSuiteDut(id.into()))
+            .expect("Action Channel closed");
     }
 
     pub fn set_via_operator(&self, text_input: &mut TextInput) {

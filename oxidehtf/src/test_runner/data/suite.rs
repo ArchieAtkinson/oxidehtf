@@ -24,6 +24,7 @@ pub struct SuiteDataCollection {
 
 #[derive(Debug, Clone)]
 pub struct SuiteDataRaw {
+    pub name: &'static str,
     pub start_time: DateTime<FixedOffset>,
     pub dut_id: String,
     pub test_metadata: Vec<TestData>,
@@ -91,9 +92,10 @@ impl SuiteDataCollection {
 }
 
 impl SuiteDataRaw {
-    pub fn new(names: Vec<&'static str>) -> Self {
+    pub fn new(func_names: Vec<&'static str>, suite_name: &'static str) -> Self {
         Self {
-            test_metadata: names
+            name: suite_name,
+            test_metadata: func_names
                 .iter()
                 .map(|n| TestData {
                     name: *n,

@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::time::Duration;
 
-use super::{blocking_write, suite::SuiteDataCollectionHolder, TestState};
+use super::{blocking_read, blocking_write, suite::SuiteDataCollectionHolder, TestState};
 use crate::{common::*, test_runner::MeasurementDefinition};
 
 #[derive(Debug, Clone)]
@@ -37,6 +37,10 @@ impl CurrentTestData {
             d.inner[d.current].current_test_mut().duration = duration;
             Ok(())
         })
+    }
+
+    pub fn get_test_name(&self) -> Result<&'static str> {
+        blocking_read(&self.inner, |d| Ok(d.inner[d.current].current_test().name))
     }
 
     pub fn insert_measurement(&self, name: &str, def: MeasurementDefinition) -> Result<()> {

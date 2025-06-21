@@ -14,8 +14,6 @@ fn fixture() -> Fixture {
 }
 
 fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
-    info!("Running Test1");
-
     context.dut.set_via_operator(&mut context.text_input);
 
     let input = context.text_input.request("The answer is 'Test'");
@@ -49,8 +47,6 @@ fn test2_with_longer_name(
     context: &mut SysContext,
     _fixture: &mut Fixture,
 ) -> Result<(), oxidehtf::TestFailure> {
-    info!("Running Test12");
-
     let input = context.text_input.request("The answer is 'Hello'");
 
     info!("{}", input);
@@ -60,20 +56,30 @@ fn test2_with_longer_name(
     Ok(())
 }
 
-fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
+fn create_suite_1() -> oxidehtf::TestSuiteBuilder {
     oxidehtf::TestSuiteBuilder::new(
         vec![test1, test2_with_longer_name],
         fixture,
         vec!["test1", "test2"],
+        "Suite2",
+    )
+}
+
+fn create_suite_2() -> oxidehtf::TestSuiteBuilder {
+    oxidehtf::TestSuiteBuilder::new(
+        vec![test1, test2_with_longer_name],
+        fixture,
+        vec!["test1", "test2"],
+        "Suite1",
     )
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
+    oxidehtf::TestSuiteBuilderProducer {func: create_suite_1}
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
+    oxidehtf::TestSuiteBuilderProducer {func: create_suite_2}
 }
 
 fn main() -> Result<()> {
