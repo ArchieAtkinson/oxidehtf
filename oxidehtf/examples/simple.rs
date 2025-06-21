@@ -71,11 +71,11 @@ fn create_suite_2() -> oxidehtf::TestSuiteBuilder {
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1)
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1, 1)
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2)
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2, 0)
 }
 
 fn main() -> Result<()> {

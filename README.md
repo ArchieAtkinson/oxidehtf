@@ -26,7 +26,7 @@ OxideHTF provides (or will...):
     - Async Tests
     - Suite Naming ✅
     - Multiple Suits ✅
-        - Set Suite Order?
+        - Set Suite Order ✅
     - Multiple DUTs
     - Test Failures
         - Create more specific errors

@@ -49,12 +49,16 @@ impl App {
         let (event_tx, event_rx) = unbounded_channel();
         let (action_tx, action_rx) = broadcast::channel(16);
 
-        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) =
-            inventory::iter::<TestSuiteBuilderProducer>
-                .into_iter()
-                .map(|f| ((*f).func)())
-                .map(|f| (f.data, f.executer))
-                .collect();
+        let mut producers = inventory::iter::<TestSuiteBuilderProducer>
+            .into_iter()
+            .collect::<Vec<&TestSuiteBuilderProducer>>();
+        producers.sort_by(|a, b| a.priority.cmp(&b.priority));
+
+        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) = producers
+            .iter()
+            .map(|f| ((*f).func)())
+            .map(|f| (f.data, f.executer))
+            .collect();
 
         info!("{}", data.len());
 

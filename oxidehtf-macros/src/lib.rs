@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, ItemMod, Visibility, parse_macro_input, token};
+use syn::{ItemFn, ItemMod, LitInt, Visibility, parse_macro_input, token};
 
 enum FuncKind {
     None,
@@ -9,7 +9,31 @@ enum FuncKind {
 }
 
 #[proc_macro_attribute]
-pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn tests(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut value: usize = 0; // Default value if no input is present
+
+    if !attr.is_empty() {
+        // Attempt to parse the attribute input
+        let parsed_attr = syn::parse::<LitInt>(attr.clone());
+
+        match parsed_attr {
+            Ok(lit_int) => {
+                // Successfully parsed as LitInt, now try to convert to usize
+                match lit_int.base10_parse::<usize>() {
+                    Ok(parsed_value) => {
+                        value = parsed_value;
+                    }
+                    Err(e) => {
+                        panic!("{}", e);
+                    }
+                }
+            }
+            Err(_) => {
+                panic!("Attribute must be a usize integer literal or empty.");
+            }
+        }
+    }
+
     let mut input = parse_macro_input!(item as ItemMod);
 
     let mut fixture_init: Option<ItemFn> = None;
@@ -80,7 +104,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         inventory::submit!{
-            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory)
+            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory, #value)
         }
 
     };

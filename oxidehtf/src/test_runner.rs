@@ -23,11 +23,12 @@ pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
 pub struct TestSuiteBuilderProducer {
     pub(crate) func: fn() -> TestSuiteBuilder,
+    pub(crate) priority: usize,
 }
 
 impl TestSuiteBuilderProducer {
-    pub const fn new(func: fn() -> TestSuiteBuilder) -> Self {
-        Self { func }
+    pub const fn new(func: fn() -> TestSuiteBuilder, priority: usize) -> Self {
+        Self { func, priority }
     }
 }
 

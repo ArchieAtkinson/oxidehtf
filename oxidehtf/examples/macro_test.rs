@@ -3,7 +3,7 @@ use oxidehtf::TestLifecycle;
 pub struct Fixture {}
 impl TestLifecycle for Fixture {}
 
-#[oxidehtf_macros::tests]
+#[oxidehtf_macros::tests(1)]
 mod suite1 {
     use std::time::Duration;
 
