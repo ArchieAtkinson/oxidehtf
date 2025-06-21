@@ -1,4 +1,4 @@
-use crate::{common::*, test_runner::data::suite::SuiteDataRaw, ui::UiAreas};
+use crate::{common::*, test_runner::SuiteDataCollectionRaw, ui::UiAreas};
 use ratatui::Frame;
 
 pub mod completed_tests;
@@ -50,5 +50,10 @@ pub trait Component {
         ()
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, state: &SuiteDataRaw) -> Result<()>;
+    fn draw(
+        &mut self,
+        frame: &mut Frame,
+        area: &UiAreas,
+        state: &SuiteDataCollectionRaw,
+    ) -> Result<()>;
 }

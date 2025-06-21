@@ -1,4 +1,4 @@
-use crate::{app::Screen, common::*};
+use crate::{app::Screen, common::*, test_runner::SuiteDataCollectionRaw};
 use ratatui::{
     layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::Style,
@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{test_runner::SuiteDataRaw, ui::UiAreas};
+use crate::ui::UiAreas;
 
 use super::Component;
 
@@ -23,7 +23,7 @@ impl WeclomeDisplay {
         }
     }
 
-    fn render_progress(&self, frame: &mut Frame, area: Rect, _data: &SuiteDataRaw) {
+    fn render_progress(&self, frame: &mut Frame, area: Rect, _data: &SuiteDataCollectionRaw) {
         let text = vec![
             "Welcome to OxideHTF!".into(),
             "Press Tab to change focus, and Esc to quit.".into(),
@@ -86,7 +86,12 @@ impl Component for WeclomeDisplay {
         self.is_focused = false;
     }
 
-    fn draw(&mut self, frame: &mut Frame, _area: &UiAreas, _data: &SuiteDataRaw) -> Result<()> {
+    fn draw(
+        &mut self,
+        frame: &mut Frame,
+        _area: &UiAreas,
+        _data: &SuiteDataCollectionRaw,
+    ) -> Result<()> {
         self.render_progress(frame, frame.area(), _data);
         Ok(())
     }

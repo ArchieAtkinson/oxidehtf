@@ -1,24 +1,24 @@
 use crate::{
     common::*,
-    test_runner::{CurrentTestData, TestRunning, TestState},
+    test_runner::{data::suite::SuiteDataCollection, TestRunning, TestState},
 };
 
 pub struct TextInput {
     event_tx: UnboundedSender<Event>,
     action_rx: broadcast::Receiver<Action>,
-    current_test: CurrentTestData,
+    suites_data: SuiteDataCollection,
 }
 
 impl TextInput {
     pub fn new(
         event_tx: UnboundedSender<Event>,
         action_rx: broadcast::Receiver<Action>,
-        current_test: CurrentTestData,
+        suites_data: SuiteDataCollection,
     ) -> Self {
         Self {
             event_tx,
             action_rx,
-            current_test,
+            suites_data,
         }
     }
 
@@ -29,24 +29,35 @@ impl TextInput {
             .send(Event::UserInputPrompt(prompt.into()))
             .expect("Failed to send user Prompt");
 
-        self.current_test
-            .set_state(TestState::Running(TestRunning::WaitingForInput))
-            .unwrap();
+        self.suites_data
+            .blocking_write(|f| {
+                f.current_suite_mut().current_test_mut().state =
+                    TestState::Running(TestRunning::WaitingForInput);
+                Ok(())
+            })
+            .expect("Failed to Write");
 
         let input = loop {
-            if let Ok(action) = self.action_rx.blocking_recv() {
-                match action {
+            use broadcast::error::RecvError::*;
+            match self.action_rx.blocking_recv() {
+                Ok(action) => match action {
                     Action::UserInputValue(s) => break s,
                     _ => (),
-                }
-            } else {
-                panic!("Channel Closed");
+                },
+                Err(e) => match e {
+                    Lagged(_) => (),
+                    Closed => panic!("Channel Closed"),
+                },
             }
         };
 
-        self.current_test
-            .set_state(TestState::Running(TestRunning::Running))
-            .unwrap();
+        self.suites_data
+            .blocking_write(|f| {
+                f.current_suite_mut().current_test_mut().state =
+                    TestState::Running(TestRunning::Running);
+                Ok(())
+            })
+            .expect("Failed to write");
 
         input
     }

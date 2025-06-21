@@ -36,10 +36,6 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxideht
             .set_str(format!("Value {i}"))?;
     }
 
-    let input = context.text_input.request("Second Prompt");
-
-    info!("{}", input);
-
     Ok(())
 }
 
@@ -61,7 +57,7 @@ fn create_suite_1() -> oxidehtf::TestSuiteBuilder {
         vec![test1, test2_with_longer_name],
         fixture,
         vec!["test1", "test2"],
-        "Suite2",
+        "Suite1",
     )
 }
 
@@ -70,16 +66,16 @@ fn create_suite_2() -> oxidehtf::TestSuiteBuilder {
         vec![test1, test2_with_longer_name],
         fixture,
         vec!["test1", "test2"],
-        "Suite1",
+        "Suite2",
     )
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer {func: create_suite_1}
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1)
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer {func: create_suite_2}
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2)
 }
 
 fn main() -> Result<()> {

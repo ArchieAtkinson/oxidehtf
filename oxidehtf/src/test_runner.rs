@@ -10,9 +10,9 @@ pub mod lifecycle;
 
 pub use context::measurement::MeasurementDefinition;
 pub use context::SysContext;
-pub use data::current_test::CurrentTestData;
+pub use data::suite::SuiteData;
 use data::suite::SuiteDataCollection;
-pub use data::suite::SuiteDataRaw;
+pub use data::suite::SuiteDataCollectionRaw;
 pub use data::{TestDone, TestRunning, TestState};
 pub use errors::TestFailure;
 pub use executer::SuiteExecuter;
@@ -22,11 +22,18 @@ pub use lifecycle::TestLifecycle;
 pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
 pub struct TestSuiteBuilderProducer {
-    pub func: fn() -> TestSuiteBuilder,
+    pub(crate) func: fn() -> TestSuiteBuilder,
 }
+
+impl TestSuiteBuilderProducer {
+    pub const fn new(func: fn() -> TestSuiteBuilder) -> Self {
+        Self { func }
+    }
+}
+
 pub struct TestSuiteBuilder {
-    pub executer: Box<dyn SuiteExecuter>,
-    pub data: SuiteDataRaw,
+    pub(crate) executer: Box<dyn SuiteExecuter>,
+    pub(crate) data: SuiteData,
 }
 
 impl TestSuiteBuilder {
@@ -38,7 +45,7 @@ impl TestSuiteBuilder {
     ) -> Self {
         Self {
             executer: Box::new(SuiteExecuterHolder::new(funcs, fixture_init)),
-            data: SuiteDataRaw::new(names, suite_name),
+            data: SuiteData::new(names, suite_name),
         }
     }
 }
@@ -73,13 +80,16 @@ impl TestRunner {
         info!("Starting Test Runner");
 
         loop {
-            if let Ok(action) = self.action_rx.blocking_recv() {
-                match action {
+            use broadcast::error::RecvError::*;
+            match self.action_rx.blocking_recv() {
+                Ok(action) => match action {
                     Action::StartTests => break,
                     _ => (),
-                }
-            } else {
-                return Err(eyre!("Failed to start tests"));
+                },
+                Err(e) => match e {
+                    Lagged(_) => (),
+                    Closed => panic!("Channel Closed"),
+                },
             }
         }
 
@@ -94,21 +104,27 @@ impl TestRunner {
 
             self.executor[suite_index].fixture_init();
 
-            self.data.set_suite_start_time()?;
+            self.data.blocking_write(|f| f.set_suite_start_time())?;
 
             self.executor[suite_index].fixture().setup()?;
 
-            for (index, data) in self.data.current_testdata_iter().enumerate() {
-                info!("Starting Test: {}", data.get_test_name()?);
+            let test_num = self
+                .data
+                .blocking_read(|f| Ok(f.current_suite().get_test_amount()))?;
 
-                data.set_state(TestState::Running(TestRunning::Running))?;
+            for index in 0..test_num {
+                let test_name = self.data.blocking_write(|f| {
+                    f.current_suite_mut().update_test_index(index);
+                    f.current_suite_mut().current_test_mut().state =
+                        TestState::Running(TestRunning::Running);
+                    Ok(f.current_suite().current_test().name)
+                })?;
 
+                info!("Starting Test: {}", test_name);
                 self.executor[suite_index].fixture().before_test()?;
-
                 let start_time = Instant::now();
                 let result = self.executor[suite_index].run_test(index, &mut self.context);
                 let test_duration = Instant::now() - start_time;
-
                 self.executor[suite_index].fixture().after_test()?;
 
                 let final_state = match result {
@@ -116,8 +132,11 @@ impl TestRunner {
                     Err(_) => TestState::Done(TestDone::Failed),
                 };
 
-                data.set_state(final_state)?;
-                data.set_test_duration(test_duration)?;
+                self.data.blocking_write(|f| {
+                    f.current_suite_mut().current_test_mut().state = final_state;
+                    f.current_suite_mut().current_test_mut().duration = test_duration;
+                    Ok(())
+                })?;
             }
 
             self.event_tx.send(Event::TestsCompleted)?;

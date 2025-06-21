@@ -10,7 +10,7 @@ use ratatui::{
 use crate::{
     common::*,
     event_handlers::MovementHandler,
-    test_runner::{SuiteDataRaw, TestState},
+    test_runner::{SuiteDataCollectionRaw, TestState},
     ui::UiAreas,
 };
 
@@ -61,20 +61,20 @@ impl CurrentTestDisplay {
         *offset = (*offset).clamp(0 as usize, max_offset);
     }
 
-    fn render_current_test(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataRaw) {
-        let current_test = data.test_metadata.iter().find(|t| match t.state {
-            TestState::Running(_) => true,
-            _ => false,
-        });
-
+    fn render_current_test(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        data: &SuiteDataCollectionRaw,
+    ) {
+        let current_test = data.current_suite().current_test();
         // 2 for border, 1 for header = 3
         self.current_rows_seen = usize::from(area.height) - 3;
 
         let current_test_name: String = {
-            if let Some(current_test) = current_test {
-                current_test.name.into()
-            } else {
-                "No Running Test".into()
+            match current_test.state {
+                TestState::Running(_) => current_test.name.into(),
+                _ => "No Running Test".into(),
             }
         };
 
@@ -88,7 +88,8 @@ impl CurrentTestDisplay {
 
         let mut rows = Vec::new();
 
-        if let Some(current_test) = current_test {
+        // Ensure we only display running test
+        if current_test.name == current_test_name {
             for data in &current_test.user_data {
                 let name = data.0.clone();
                 let Some(value) = data.1.value.clone() else {
@@ -202,7 +203,12 @@ impl Component for CurrentTestDisplay {
         self.is_focused = false;
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataRaw) -> Result<()> {
+    fn draw(
+        &mut self,
+        frame: &mut Frame,
+        area: &UiAreas,
+        data: &SuiteDataCollectionRaw,
+    ) -> Result<()> {
         let area = area.current_test;
         self.render_current_test(frame, area, data);
         self.render_scrollbar(frame, area);

@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     common::*,
-    test_runner::{
-        data::{suite::SuiteDataCollection, write},
-        SuiteDataRaw, SuiteExecuter,
-    },
+    test_runner::{data::suite::SuiteDataCollection, SuiteData, SuiteExecuter},
     TestSuiteBuilderProducer,
 };
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -52,7 +49,7 @@ impl App {
         let (event_tx, event_rx) = unbounded_channel();
         let (action_tx, action_rx) = broadcast::channel(16);
 
-        let (data, executors): (Vec<SuiteDataRaw>, Vec<Box<dyn SuiteExecuter>>) =
+        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) =
             inventory::iter::<TestSuiteBuilderProducer>
                 .into_iter()
                 .map(|f| ((*f).func)())
@@ -213,11 +210,12 @@ impl App {
                     self.focus_default()?;
                 }
                 SetCurrentSuiteDut(s) => {
-                    write(&self.suites_data.data, &self.event_tx, |d| {
-                        d.inner[d.current].dut_id = s;
-                        Ok(())
-                    })
-                    .await?
+                    self.suites_data
+                        .write(|d| {
+                            d.dut_id = s;
+                            Ok(())
+                        })
+                        .await?
                 }
                 _ => (),
             }
@@ -320,7 +318,7 @@ impl App {
         for suite in &self.suites_data.data.read().await.inner {
             let mut test_suite = TestSuite::new(format!("{}", suite.name));
 
-            for test in &suite.test_metadata {
+            for test in &suite.test_data {
                 let test_case_result = match &test.state {
                     TestState::Done(r) => match r {
                         TestDone::Passed => TestCaseStatus::success(),

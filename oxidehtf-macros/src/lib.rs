@@ -80,7 +80,7 @@ pub fn tests(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         inventory::submit!{
-            oxidehtf::TestSuiteBuilderProducer {func: create_suite_inventory}
+            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory)
         }
 
     };

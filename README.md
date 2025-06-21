@@ -11,6 +11,9 @@ OxideHTF provides (or will...):
 - Surfaces user-defined dependencies to each test 
 - Log measurements taken and check their correctness
 
+**Know Bugs**
+- Backspace on empty Input Field crashes
+
 
 **Feature List:**
 - General
@@ -21,8 +24,9 @@ OxideHTF provides (or will...):
 - Test Runner
     - Runs Tests ✅
     - Async Tests
-    - Suite Naming
-    - Multiple Suits
+    - Suite Naming ✅
+    - Multiple Suits ✅
+        - Set Suite Order?
     - Multiple DUTs
     - Test Failures
         - Create more specific errors

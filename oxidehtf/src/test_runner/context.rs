@@ -22,14 +22,9 @@ impl SysContext {
         event_tx: UnboundedSender<Event>,
         action_tx: broadcast::Sender<Action>,
     ) -> Self {
-        let current_test = suite_data.current_test_ref();
         Self {
-            text_input: TextInput::new(
-                event_tx.clone(),
-                action_tx.subscribe(),
-                current_test.clone(),
-            ),
-            measurements: Measurements::new(current_test.clone()),
+            text_input: TextInput::new(event_tx.clone(), action_tx.subscribe(), suite_data.clone()),
+            measurements: Measurements::new(suite_data.clone()),
             dut: Dut::new(action_tx.clone()),
         }
     }

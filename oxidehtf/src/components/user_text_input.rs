@@ -6,7 +6,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::{common::*, event_handlers::TextInputHandler, test_runner::SuiteDataRaw, ui::UiAreas};
+use crate::{
+    common::*, event_handlers::TextInputHandler, test_runner::SuiteDataCollectionRaw, ui::UiAreas,
+};
 
 use super::Component;
 
@@ -29,7 +31,12 @@ impl UserTextInput {
         }
     }
 
-    fn draw_input(&mut self, frame: &mut Frame, area: Rect, _data: &SuiteDataRaw) -> Result<()> {
+    fn draw_input(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        _data: &SuiteDataCollectionRaw,
+    ) -> Result<()> {
         let border_style = if self.is_focused {
             Style::default().yellow()
         } else {
@@ -119,7 +126,12 @@ impl Component for UserTextInput {
         self.is_focused = false;
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: &UiAreas, data: &SuiteDataRaw) -> Result<()> {
+    fn draw(
+        &mut self,
+        frame: &mut Frame,
+        area: &UiAreas,
+        data: &SuiteDataCollectionRaw,
+    ) -> Result<()> {
         assert_eq!(area.operator.height, 3);
         self.draw_input(frame, area.operator, data)?;
 

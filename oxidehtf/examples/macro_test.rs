@@ -1,14 +1,16 @@
+use oxidehtf::TestLifecycle;
+
+pub struct Fixture {}
+impl TestLifecycle for Fixture {}
+
 #[oxidehtf_macros::tests]
 mod suite1 {
     use std::time::Duration;
 
+    use super::*;
     use cli_log::*;
     use color_eyre::eyre::Result;
-    use oxidehtf::{SysContext, TestLifecycle};
-
-    pub struct Fixture {}
-
-    impl TestLifecycle for Fixture {}
+    use oxidehtf::SysContext;
 
     #[fixture]
     fn fixture() -> Fixture {
@@ -53,11 +55,9 @@ mod suite2 {
 
     use cli_log::*;
     use color_eyre::eyre::Result;
-    use oxidehtf::{SysContext, TestLifecycle};
+    use oxidehtf::SysContext;
 
-    pub struct Fixture {}
-
-    impl TestLifecycle for Fixture {}
+    use super::*;
 
     #[fixture]
     fn fixture() -> Fixture {

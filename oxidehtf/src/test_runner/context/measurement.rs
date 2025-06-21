@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::test_runner::{CurrentTestData, TestFailure};
+use crate::test_runner::{data::suite::SuiteDataCollection, TestFailure};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Unit {
@@ -22,14 +22,14 @@ pub struct MeasurementDefinition {
 
 pub struct Measurements {
     definitions: HashMap<String, MeasurementDefinition>,
-    current_test: CurrentTestData,
+    suites_data: SuiteDataCollection,
 }
 
 impl Measurements {
-    pub fn new(current_test: CurrentTestData) -> Self {
+    pub fn new(suites_data: SuiteDataCollection) -> Self {
         Measurements {
             definitions: HashMap::new(),
-            current_test,
+            suites_data,
         }
     }
 
@@ -58,9 +58,9 @@ impl Measurements {
 
         def.value = Some(value.clone());
 
-        self.current_test
-            .insert_measurement(name, def.clone())
-            .unwrap();
+        self.suites_data
+            .blocking_write(|f| Ok(f.current_suite_mut().insert_measurement(name, def.clone())))
+            .expect("Failed to write measuremnt");
 
         if let DataTypes::F64(value) = value {
             if let Some((min, max)) = def.range {
