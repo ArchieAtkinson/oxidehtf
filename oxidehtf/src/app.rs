@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
     common::*,
@@ -38,8 +38,8 @@ pub struct App {
     test_runner: Option<TestRunner>,
     current_focus: usize,
     current_screen: Screen,
-    action_rx: broadcast::Receiver<Action>,
-    action_tx: broadcast::Sender<Action>,
+    actions: VecDeque<Action>,
+    to_test_runner_tx: UnboundedSender<Action>,
     event_rx: UnboundedReceiver<Event>,
     event_tx: UnboundedSender<Event>,
 }
@@ -47,7 +47,7 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         let (event_tx, event_rx) = unbounded_channel();
-        let (action_tx, action_rx) = broadcast::channel(16);
+        let (to_test_runner_tx, to_test_runner_rx) = unbounded_channel();
 
         let mut builders = inventory::iter::<TestSuiteBuilderProducer>
             .into_iter()
@@ -64,7 +64,7 @@ impl App {
             executors,
             suites_collection.clone(),
             event_tx.clone(),
-            action_tx.clone(),
+            to_test_runner_rx,
         );
 
         let running_tests_screen: Vec<Box<dyn Component>> = vec![
@@ -89,18 +89,14 @@ impl App {
             current_focus: 0,
             current_screen: Screen::Welcome,
             state: Default::default(),
-            action_tx,
-            action_rx,
+            actions: VecDeque::new(),
+            to_test_runner_tx,
             event_rx,
             event_tx,
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let mut test_runner = self.test_runner.take().ok_or_eyre("No Test Runner")?;
-        let mut runner_handle = tokio::task::spawn_blocking(move || test_runner.run());
-        let mut is_runner_done = false;
-
         for component in self.components.values_mut().flat_map(|v| v.iter_mut()) {
             component.register_event_handler(self.event_tx.clone())?;
             component.init()?;
@@ -123,6 +119,10 @@ impl App {
             }
             Ok(())
         })?;
+
+        let mut test_runner = self.test_runner.take().ok_or_eyre("No Test Runner")?;
+        let mut runner_handle = tokio::task::spawn_blocking(move || test_runner.run());
+        let mut is_runner_done = false;
 
         while self.state() != AppState::Done {
             self.handle_event().await?;
@@ -161,23 +161,28 @@ impl App {
     }
 
     async fn handle_event(&mut self) -> Result<()> {
-        let Some(event) = self.event_rx.recv().await else {
+        let Some(mut event) = self.event_rx.recv().await else {
             return Ok(());
         };
 
-        let action = match event.clone() {
+        let action = match event {
             Event::Key(key) => match (key.modifiers, key.code) {
                 (_, KeyCode::Esc) => Some(Action::ExitApp),
                 (KeyModifiers::NONE, KeyCode::Tab) => Some(Action::FocusNextPane),
                 (KeyModifiers::SHIFT, KeyCode::BackTab) => Some(Action::FocusPreviousPane),
                 _ => None,
             },
-            Event::UserInputPrompt(s) => Some(Action::UserInputPrompt(s)),
+            Event::UserInputPrompt(ref s, ref mut c) => {
+                info!("HERE");
+                let channel = c.take();
+                Some(Action::UserInputPrompt(s.clone(), channel))
+            }
+            Event::CurrentSuiteDut(ref s) => Some(Action::SetCurrentSuiteDut(s.clone())),
             _ => None,
         };
 
         if let Some(action) = action {
-            self.action_tx.send(action)?;
+            self.actions.push_back(action);
         }
 
         for component in self
@@ -186,8 +191,8 @@ impl App {
             .ok_or_eyre("Screen not present")?
             .iter_mut()
         {
-            if let Some(new_action) = component.handle_events(event.clone())? {
-                self.action_tx.send(new_action)?;
+            if let Some(new_action) = component.handle_events(&event)? {
+                self.actions.push_back(new_action);
             }
         }
 
@@ -197,22 +202,22 @@ impl App {
     async fn handle_actions(&mut self) -> Result<()> {
         use Action::*;
 
-        while let Ok(action) = self.action_rx.try_recv() {
-            match action.clone() {
+        while let Some(mut action) = self.actions.pop_front() {
+            match action {
                 ExitApp => self.state = AppState::Done,
                 FocusNextPane => self.focus_next()?,
                 FocusPreviousPane => self.focus_previous()?,
                 ChangeScreen(s) => {
                     if s == Screen::RunningTests {
-                        self.action_tx.send(Action::StartTests)?;
+                        self.actions.push_back(Action::StartTests);
                     }
                     self.current_screen = s;
                     self.focus_default()?;
                 }
-                SetCurrentSuiteDut(s) => {
+                SetCurrentSuiteDut(ref s) => {
                     self.suites_data
                         .write(|d| {
-                            d.dut_id = s;
+                            d.dut_id = s.clone();
                             Ok(())
                         })
                         .await?
@@ -226,10 +231,12 @@ impl App {
                 .ok_or_eyre("Screen not present")?
                 .iter_mut()
             {
-                if let Some(new_action) = component.update(action.clone())? {
-                    self.action_tx.send(new_action)?;
+                if let Some(new_action) = component.update(&mut action)? {
+                    self.actions.push_back(new_action);
                 }
             }
+
+            self.to_test_runner_tx.send(action)?;
         }
 
         Ok(())

@@ -174,7 +174,7 @@ impl Component for CurrentTestDisplay {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
         if self.is_focused {
             Ok(MovementHandler::handle_event(event))
         } else {
@@ -182,7 +182,7 @@ impl Component for CurrentTestDisplay {
         }
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: &mut Action) -> Result<Option<Action>> {
         match action {
             Action::MoveUp => self.scroll(Scroll::Up),
             Action::MoveDown => self.scroll(Scroll::Down),

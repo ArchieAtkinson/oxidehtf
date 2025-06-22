@@ -1,11 +1,12 @@
 use crossterm::event::{KeyEvent, MouseEvent};
+use tokio::sync::oneshot;
 
-#[derive(Debug, Clone)]
 pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
     Paste(String),
     UpdatedTestData,
     TestsCompleted,
-    UserInputPrompt(String),
+    UserInputPrompt(String, Option<oneshot::Sender<String>>),
+    CurrentSuiteDut(String),
 }

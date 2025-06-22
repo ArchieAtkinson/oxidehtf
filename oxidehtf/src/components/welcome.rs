@@ -77,7 +77,7 @@ impl Component for WeclomeDisplay {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
         if !self.is_focused {
             return Ok(None);
         }

@@ -28,12 +28,12 @@ pub trait Component {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
         let _ = event;
         Ok(None)
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: &mut Action) -> Result<Option<Action>> {
         let _ = action;
         Ok(None)
     }

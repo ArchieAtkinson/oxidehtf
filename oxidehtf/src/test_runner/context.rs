@@ -17,15 +17,11 @@ pub struct SysContext {
 }
 
 impl SysContext {
-    pub fn new(
-        suite_data: SuiteDataCollection,
-        event_tx: UnboundedSender<Event>,
-        action_tx: broadcast::Sender<Action>,
-    ) -> Self {
+    pub fn new(suite_data: SuiteDataCollection, event_tx: UnboundedSender<Event>) -> Self {
         Self {
-            text_input: TextInput::new(event_tx.clone(), action_tx.subscribe(), suite_data.clone()),
+            text_input: TextInput::new(event_tx.clone(), suite_data.clone()),
             measurements: Measurements::new(suite_data.clone()),
-            dut: Dut::new(action_tx.clone()),
+            dut: Dut::new(event_tx.clone()),
         }
     }
 }

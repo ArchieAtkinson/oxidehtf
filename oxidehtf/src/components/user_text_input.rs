@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Paragraph},
     Frame,
 };
+use tokio::sync::oneshot;
 
 use crate::{
     common::*, event_handlers::TextInputHandler, test_runner::SuiteDataCollectionRaw, ui::UiAreas,
@@ -17,6 +18,7 @@ pub struct UserTextInput {
     txt_input: tui_input::Input,
     prompt: String,
     is_focused: bool,
+    reply: Option<oneshot::Sender<String>>,
 }
 
 impl UserTextInput {
@@ -28,6 +30,7 @@ impl UserTextInput {
             txt_input: Default::default(),
             prompt: Self::DEFAULT_PROMPT.into(),
             is_focused: false,
+            reply: None,
         }
     }
 
@@ -78,7 +81,7 @@ impl Component for UserTextInput {
         Ok(())
     }
 
-    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
         if !self.is_focused {
             return Ok(None);
         }
@@ -93,22 +96,32 @@ impl Component for UserTextInput {
         }
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: &mut Action) -> Result<Option<Action>> {
         match action {
             Action::UserKeyInputRequest(e) => {
                 if !self.is_focused {
                     return Ok(None);
                 }
                 self.txt_input
-                    .handle(e)
+                    .handle(e.clone())
                     .expect("Failed to handle text input");
             }
             Action::SendInput => {
                 let input = self.txt_input.value_and_reset();
                 self.prompt = Self::DEFAULT_PROMPT.into();
-                return Ok(Some(Action::UserInputValue(input)));
+                let sender = self.reply.take().unwrap();
+                sender.send(input).unwrap();
+                info!("Sent!");
+                return Ok(None);
             }
-            Action::UserInputPrompt(v) => self.prompt = v,
+            Action::UserInputPrompt(v, ref mut c) => {
+                self.prompt = v.clone();
+                self.reply = c.take();
+                if self.reply.is_none() {
+                    info!("NONE");
+                }
+                info!("HERE");
+            }
             _ => (),
         }
         Ok(None)

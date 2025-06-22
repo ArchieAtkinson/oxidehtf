@@ -3,17 +3,17 @@ use crate::common::*;
 use super::user_text_input::TextInput;
 
 pub struct Dut {
-    action_tx: broadcast::Sender<Action>,
+    event_tx: UnboundedSender<Event>,
 }
 
 impl Dut {
-    pub fn new(action_tx: broadcast::Sender<Action>) -> Self {
-        Self { action_tx }
+    pub fn new(event_tx: UnboundedSender<Event>) -> Self {
+        Self { event_tx }
     }
 
     pub fn set_id(&self, id: impl Into<String>) {
-        self.action_tx
-            .send(Action::SetCurrentSuiteDut(id.into()))
+        self.event_tx
+            .send(Event::CurrentSuiteDut(id.into()))
             .expect("Action Channel closed");
     }
 

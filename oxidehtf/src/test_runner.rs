@@ -57,8 +57,8 @@ pub struct TestRunner {
     executor: Vec<Box<dyn SuiteExecuter>>,
     data: SuiteDataCollection,
     event_tx: UnboundedSender<Event>,
-    action_rx: broadcast::Receiver<Action>,
     context: SysContext,
+    from_app_rx: UnboundedReceiver<Action>,
 }
 
 impl TestRunner {
@@ -66,14 +66,14 @@ impl TestRunner {
         executor: Vec<Box<dyn SuiteExecuter>>,
         data: SuiteDataCollection,
         event_tx: UnboundedSender<Event>,
-        action_tx: broadcast::Sender<Action>,
+        from_app_rx: UnboundedReceiver<Action>,
     ) -> Self {
         Self {
             executor,
             data: data.clone(),
             event_tx: event_tx.clone(),
-            action_rx: action_tx.subscribe(),
-            context: SysContext::new(data.clone(), event_tx, action_tx.clone()),
+            context: SysContext::new(data.clone(), event_tx),
+            from_app_rx,
         }
     }
 
@@ -81,16 +81,10 @@ impl TestRunner {
         info!("Starting Test Runner");
 
         loop {
-            use broadcast::error::RecvError::*;
-            match self.action_rx.blocking_recv() {
-                Ok(action) => match action {
-                    Action::StartTests => break,
-                    _ => (),
-                },
-                Err(e) => match e {
-                    Lagged(_) => (),
-                    Closed => panic!("Channel Closed"),
-                },
+            let action = self.from_app_rx.blocking_recv().unwrap();
+            match action {
+                Action::StartTests => break,
+                _ => (),
             }
         }
 

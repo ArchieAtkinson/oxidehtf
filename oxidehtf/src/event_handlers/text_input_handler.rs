@@ -6,7 +6,7 @@ use crate::common::*;
 pub struct TextInputHandler {}
 
 impl TextInputHandler {
-    pub fn handle_events(event: Event) -> Option<Action> {
+    pub fn handle_events(event: &Event) -> Option<Action> {
         use InputRequest::*;
         use KeyCode::*;
 
