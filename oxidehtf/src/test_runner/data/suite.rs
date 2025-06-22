@@ -21,6 +21,7 @@ pub struct SuiteDataCollection {
 #[derive(Debug, Clone)]
 pub struct SuiteData {
     pub name: &'static str,
+    pub priority: usize,
     pub start_time: DateTime<FixedOffset>,
     pub test_data: Vec<TestData>,
     pub current_index: usize,
@@ -116,7 +117,7 @@ impl SuiteDataCollectionRaw {
 }
 
 impl SuiteData {
-    pub fn new(func_names: Vec<&'static str>, suite_name: &'static str) -> Self {
+    pub fn new(func_names: Vec<&'static str>, suite_name: &'static str, priority: usize) -> Self {
         Self {
             name: suite_name,
             test_data: func_names
@@ -130,6 +131,7 @@ impl SuiteData {
                 .collect(),
             current_index: 0,
             start_time: Default::default(),
+            priority,
         }
     }
 

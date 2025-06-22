@@ -100,11 +100,12 @@ pub fn tests(attr: TokenStream, item: TokenStream) -> TokenStream {
                 vec![#(#test_functions_pointers),*],
                 crate::#mod_name::#fixture_init_ident,
                 vec![#(#test_functions_names),*],
-                stringify!(#mod_name))
+                stringify!(#mod_name),
+                #value)
         }
 
         inventory::submit!{
-            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory, #value)
+            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory)
         }
 
     };

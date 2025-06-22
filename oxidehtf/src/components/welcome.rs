@@ -2,6 +2,7 @@ use crate::{app::Screen, common::*, test_runner::SuiteDataCollectionRaw};
 use ratatui::{
     layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::Style,
+    text::Line,
     widgets::{Block, Paragraph},
     Frame,
 };
@@ -23,12 +24,25 @@ impl WeclomeDisplay {
         }
     }
 
-    fn render_progress(&self, frame: &mut Frame, area: Rect, _data: &SuiteDataCollectionRaw) {
-        let text = vec![
+    fn welcome_screen(&self, frame: &mut Frame, area: Rect, _data: &SuiteDataCollectionRaw) {
+        let mut suites = _data
+            .inner
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                format!("{}. {} - prio: {}", i + 1, f.name.to_string(), f.priority).into()
+            })
+            .collect::<Vec<Line>>();
+
+        let mut text = vec![
             "Welcome to OxideHTF!".into(),
             "Press Tab to change focus, and Esc to quit.".into(),
             "Press any other key to start.".into(),
+            "".into(),
+            "Suites:".into(),
         ];
+
+        text.append(&mut suites);
 
         let [top_area, centre_area, bottom_area] = Layout::vertical([
             Constraint::Min(1),
@@ -92,7 +106,7 @@ impl Component for WeclomeDisplay {
         _area: &UiAreas,
         _data: &SuiteDataCollectionRaw,
     ) -> Result<()> {
-        self.render_progress(frame, frame.area(), _data);
+        self.welcome_screen(frame, frame.area(), _data);
         Ok(())
     }
 }

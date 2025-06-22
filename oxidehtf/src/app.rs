@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     common::*,
     test_runner::{data::suite::SuiteDataCollection, SuiteData, SuiteExecuter},
-    TestSuiteBuilderProducer,
+    TestSuiteBuilder, TestSuiteBuilderProducer,
 };
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -49,18 +49,14 @@ impl App {
         let (event_tx, event_rx) = unbounded_channel();
         let (action_tx, action_rx) = broadcast::channel(16);
 
-        let mut producers = inventory::iter::<TestSuiteBuilderProducer>
+        let mut builders = inventory::iter::<TestSuiteBuilderProducer>
             .into_iter()
-            .collect::<Vec<&TestSuiteBuilderProducer>>();
-        producers.sort_by(|a, b| a.priority.cmp(&b.priority));
-
-        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) = producers
-            .iter()
             .map(|f| ((*f).func)())
-            .map(|f| (f.data, f.executer))
-            .collect();
+            .collect::<Vec<TestSuiteBuilder>>();
+        builders.sort_by(|a, b| a.data.priority.cmp(&b.data.priority));
 
-        info!("{}", data.len());
+        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) =
+            builders.into_iter().map(|f| (f.data, f.executer)).collect();
 
         let suites_collection = SuiteDataCollection::new(data, event_tx.clone());
 

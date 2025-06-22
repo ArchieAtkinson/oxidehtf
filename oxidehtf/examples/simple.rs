@@ -58,6 +58,7 @@ fn create_suite_1() -> oxidehtf::TestSuiteBuilder {
         fixture,
         vec!["test1", "test2"],
         "Suite1",
+        1,
     )
 }
 
@@ -67,15 +68,16 @@ fn create_suite_2() -> oxidehtf::TestSuiteBuilder {
         fixture,
         vec!["test1", "test2"],
         "Suite2",
+        1,
     )
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1, 1)
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1)
 }
 
 inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2, 0)
+    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2)
 }
 
 fn main() -> Result<()> {

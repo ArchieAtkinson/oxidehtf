@@ -23,12 +23,11 @@ pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
 
 pub struct TestSuiteBuilderProducer {
     pub(crate) func: fn() -> TestSuiteBuilder,
-    pub(crate) priority: usize,
 }
 
 impl TestSuiteBuilderProducer {
-    pub const fn new(func: fn() -> TestSuiteBuilder, priority: usize) -> Self {
-        Self { func, priority }
+    pub const fn new(func: fn() -> TestSuiteBuilder) -> Self {
+        Self { func }
     }
 }
 
@@ -43,10 +42,11 @@ impl TestSuiteBuilder {
         fixture_init: fn() -> T,
         names: Vec<&'static str>,
         suite_name: &'static str,
+        priority: usize,
     ) -> Self {
         Self {
             executer: Box::new(SuiteExecuterHolder::new(funcs, fixture_init)),
-            data: SuiteData::new(names, suite_name),
+            data: SuiteData::new(names, suite_name, priority),
         }
     }
 }
