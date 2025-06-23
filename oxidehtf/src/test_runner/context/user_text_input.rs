@@ -3,6 +3,7 @@ use tokio::sync::oneshot;
 use crate::{
     common::*,
     test_runner::{data::suite::SuiteDataCollection, TestRunning, TestState},
+    TestFailure,
 };
 
 pub struct TextInput {
@@ -18,7 +19,7 @@ impl TextInput {
         }
     }
 
-    pub fn request(&mut self, prompt: impl Into<String>) -> String {
+    pub fn request(&mut self, prompt: impl Into<String>) -> Result<String, TestFailure> {
         let prompt = prompt.into();
 
         let (input_tx, input_rx) = oneshot::channel::<String>();
@@ -35,8 +36,9 @@ impl TextInput {
             })
             .expect("Failed to Write");
 
-        info!("Waiting for ...");
-        let input = input_rx.blocking_recv().unwrap();
+        let input = input_rx
+            .blocking_recv()
+            .or(Err(TestFailure::SystemExited))?;
 
         self.suites_data
             .blocking_write(|f| {
@@ -46,6 +48,6 @@ impl TextInput {
             })
             .expect("Failed to write");
 
-        input
+        Ok(input)
     }
 }

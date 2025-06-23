@@ -102,9 +102,7 @@ impl Component for UserTextInput {
                 if !self.is_focused {
                     return Ok(None);
                 }
-                self.txt_input
-                    .handle(e.clone())
-                    .expect("Failed to handle text input");
+                self.txt_input.handle(e.clone());
             }
             Action::SendInput => {
                 let input = self.txt_input.value_and_reset();

@@ -1,4 +1,4 @@
-use crate::common::*;
+use crate::{common::*, TestFailure};
 
 use super::user_text_input::TextInput;
 
@@ -11,14 +11,14 @@ impl Dut {
         Self { event_tx }
     }
 
-    pub fn set_id(&self, id: impl Into<String>) {
+    pub fn set_id(&self, id: impl Into<String>) -> Result<(), TestFailure> {
         self.event_tx
             .send(Event::CurrentSuiteDut(id.into()))
-            .expect("Action Channel closed");
+            .or(Err(TestFailure::SystemExited))
     }
 
-    pub fn set_via_operator(&self, text_input: &mut TextInput) {
-        let input = text_input.request("Enter DUT:");
-        self.set_id(input);
+    pub fn set_via_operator(&self, text_input: &mut TextInput) -> Result<(), TestFailure> {
+        let input = text_input.request("Enter DUT:")?;
+        self.set_id(input)
     }
 }

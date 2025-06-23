@@ -12,7 +12,6 @@ OxideHTF provides (or will...):
 - Log measurements taken and check their correctness
 
 **Know Bugs**
-- Backspace on empty Input Field crashes
 
 
 **Feature List:**
@@ -34,7 +33,7 @@ OxideHTF provides (or will...):
     - Tests that require some or no dependencies
     - Macros
         - Gather Tests ✅
-        - `#[init]` function for user fixture creation
+        - `#[init]` function for user fixture creation ✅
         - Improved error messages
 - Tools
     - Input over TUI
@@ -70,7 +69,7 @@ OxideHTF provides (or will...):
         - More info on highlight?
         - More colours
     - Integrate WASM crate for web control
-    - Welcome Screen
+    - Welcome Screen ✅
     - Summary Screen
     - Test Data Viewer 
 - Reporting

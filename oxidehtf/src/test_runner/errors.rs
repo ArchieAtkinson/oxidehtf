@@ -8,4 +8,5 @@ pub enum TestFailure {
     },
     TextInputError(String),
     MeasurementError,
+    SystemExited,
 }

@@ -24,7 +24,7 @@ mod suite1 {
     ) -> Result<(), oxidehtf::TestFailure> {
         info!("Running Test1");
 
-        let input = context.text_input.request("The answer is 'Test'");
+        let input = context.text_input.request("The answer is 'Test'")?;
 
         info!("{}", input);
 
@@ -39,7 +39,7 @@ mod suite1 {
             .in_range(0.0, 10.0)
             .set(1.0)?;
 
-        let input = context.text_input.request("Second Prompt");
+        let input = context.text_input.request("Second Prompt")?;
 
         std::thread::sleep(Duration::from_secs(1));
 
@@ -71,7 +71,7 @@ mod suite2 {
     ) -> Result<(), oxidehtf::TestFailure> {
         info!("Running Test1");
 
-        let input = context.text_input.request("The answer is 'Test'");
+        let input = context.text_input.request("The answer is 'Test'")?;
 
         info!("{}", input);
 
@@ -86,7 +86,7 @@ mod suite2 {
             .in_range(0.0, 10.0)
             .set(1.0)?;
 
-        let input = context.text_input.request("Second Prompt");
+        let input = context.text_input.request("Second Prompt")?;
 
         std::thread::sleep(Duration::from_secs(1));
 
