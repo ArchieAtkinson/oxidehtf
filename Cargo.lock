@@ -1006,6 +1006,7 @@ dependencies = [
  "ratatui",
  "thiserror 2.0.12",
  "tokio",
+ "trybuild",
  "tui-input",
 ]
 
@@ -1017,7 +1018,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
- "trybuild",
 ]
 
 [[package]]

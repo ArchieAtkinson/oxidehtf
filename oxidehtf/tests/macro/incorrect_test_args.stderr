@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+  --> tests/macro/incorrect_test_args.rs:16:8
+   |
+16 |     fn test1(_context: SysContext, _fixture: &mut Fixture) -> Result<(), TestFailure> {
+   |        ^^^^^ expected fn pointer, found fn item
+   |
+   = note: expected fn pointer `for<'a, 'b> fn(&'a mut SysContext, &'b mut _) -> Result<(), TestFailure>`
+                 found fn item `for<'a> fn(SysContext, &'a mut Fixture) -> Result<(), TestFailure> {test1}`

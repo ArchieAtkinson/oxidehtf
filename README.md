@@ -35,6 +35,7 @@ OxideHTF provides (or will...):
         - Gather Tests ✅
         - `#[init]` function for user fixture creation ✅
         - Improved error messages
+        - Move to Object system instead of Modules??
     - Test Rules
         - End suite on failure
         - End Test Run on failure
