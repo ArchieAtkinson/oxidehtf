@@ -7,7 +7,9 @@ pub mod suite;
 // use crate::common::*;
 use crate::test_runner::MeasurementDefinition;
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+use super::TestFailure;
+
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum TestState {
     #[default]
     InQueue,
@@ -15,18 +17,18 @@ pub enum TestState {
     Done(TestDone),
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum TestRunning {
     #[default]
     Running,
     WaitingForInput,
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub enum TestDone {
     #[default]
     Passed,
-    Failed,
+    Failed(TestFailure),
 }
 
 #[derive(Debug, Clone)]

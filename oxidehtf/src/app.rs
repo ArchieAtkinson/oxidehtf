@@ -329,7 +329,7 @@ impl App {
                 let test_case_result = match &test.state {
                     TestState::Done(r) => match r {
                         TestDone::Passed => TestCaseStatus::success(),
-                        TestDone::Failed => TestCaseStatus::non_success(NonSuccessKind::Failure),
+                        TestDone::Failed(_) => TestCaseStatus::non_success(NonSuccessKind::Failure),
                     },
 
                     _ => TestCaseStatus::non_success(NonSuccessKind::Error),

@@ -1,8 +1,8 @@
 use ratatui::{
     layout::Rect,
     style::Style,
-    text::Line,
-    widgets::{Block, List},
+    text::{Line, Text},
+    widgets::{Block, List, Paragraph},
     Frame,
 };
 
@@ -31,9 +31,9 @@ impl CompletedTestDisplay {
                 _ => false,
             })
             .rev()
-            .map(|test| Line::from(format!("{} - {}", test.name, test.state)));
+            .map(|test| format!("{} - {}", test.name, test.state));
 
-        let test_list = List::new(completed_tests).block(
+        let test_list = Paragraph::new(Text::from_iter(completed_tests)).block(
             Block::bordered()
                 .title("Completed Tests")
                 .title_style(Style::default().bold()),

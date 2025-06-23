@@ -65,7 +65,7 @@ impl Ui {
                 .areas(f.area());
 
                 let [completed_list, waiting_list] =
-                    Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                    Layout::vertical([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                         .areas(lists_of_tests);
 
                 let areas = UiAreas {

@@ -35,6 +35,11 @@ OxideHTF provides (or will...):
         - Gather Tests ✅
         - `#[init]` function for user fixture creation ✅
         - Improved error messages
+    - Test Rules
+        - End suite on failure
+        - End Test Run on failure
+        - Asserts that can fail
+        - Measurements that can fail
 - Tools
     - Input over TUI
         - Text Input ✅

@@ -124,7 +124,7 @@ impl TestRunner {
 
                 let final_state = match result {
                     Ok(_) => TestState::Done(TestDone::Passed),
-                    Err(_) => TestState::Done(TestDone::Failed),
+                    Err(e) => TestState::Done(TestDone::Failed(e)),
                 };
 
                 self.data.blocking_write(|f| {
@@ -158,7 +158,7 @@ impl std::fmt::Display for TestDone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Passed => write!(f, "Passed"),
-            Self::Failed => write!(f, "Failed"),
+            Self::Failed(_) => write!(f, "Failed"),
         }
     }
 }

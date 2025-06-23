@@ -27,7 +27,7 @@ fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxideht
         .measure("A Voltage Measurement")
         .with_unit("Volts")
         .in_range(0.0, 10.0)
-        .set(1.5)?;
+        .set(11.5)?;
 
     for i in 0..20 {
         context

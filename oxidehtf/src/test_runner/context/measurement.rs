@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::panic::Location;
 
 use crate::test_runner::{data::suite::SuiteDataCollection, TestFailure};
 
@@ -51,9 +52,10 @@ impl Measurements {
         }
     }
 
+    #[track_caller]
     fn set_value_internal(&mut self, name: &str, value: DataTypes) -> Result<(), TestFailure> {
         let Some(mut def) = self.definitions.remove(name) else {
-            return Err(TestFailure::MeasurementError);
+            return Err(TestFailure::MeasurementDoesntExist(name.into()));
         };
 
         def.value = Some(value.clone());
@@ -65,7 +67,13 @@ impl Measurements {
         if let DataTypes::F64(value) = value {
             if let Some((min, max)) = def.range {
                 if value < min || value > max {
-                    return Err(TestFailure::MeasurementError);
+                    return Err(TestFailure::MeasurementNotInRange {
+                        name: name.into(),
+                        expected: (min, max),
+                        found: value,
+                        file: Location::caller().file(),
+                        line: Location::caller().line(),
+                    });
                 }
             }
         }
@@ -104,12 +112,14 @@ impl<'a> MeasurementSetter<'a> {
         self
     }
 
+    #[track_caller]
     fn set_internal(self, value: DataTypes) -> Result<(), TestFailure> {
         self.manager
             .update_definition(&self.name, self.unit, self.range);
         self.manager.set_value_internal(&self.name, value)
     }
 
+    #[track_caller]
     pub fn set(self, value: f64) -> Result<(), TestFailure> {
         self.set_internal(DataTypes::F64(value))
     }
