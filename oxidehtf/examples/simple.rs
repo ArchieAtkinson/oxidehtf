@@ -1,84 +1,94 @@
 // use std::time::Duration;
 
+use std::any::Any;
+
 use cli_log::*;
 use color_eyre::eyre::Result;
-use oxidehtf::{SysContext, TestLifecycle};
+use oxidehtf::{
+    DynTestFn, SuiteProducer, SuiteProducerGenerator, SysContext, TestFailure, TestLifecycle,
+};
 
-#[derive(Default)]
-pub struct Fixture {}
+struct Suite {}
 
-impl TestLifecycle for Fixture {}
-
-fn fixture() -> Fixture {
-    Fixture {}
-}
-
-fn test1(context: &mut SysContext, _fixture: &mut Fixture) -> Result<(), oxidehtf::TestFailure> {
-    context.dut.set_via_operator(&mut context.text_input)?;
-
-    let input = context.text_input.request("The answer is 'Test'")?;
-
-    info!("{}", input);
-
-    oxidehtf::assert_eq!(input, "Test");
-
-    context
-        .measurements
-        .measure("A Voltage Measurement")
-        .with_unit("Volts")
-        .in_range(0.0, 10.0)
-        .set(11.5)?;
-
-    for i in 0..20 {
-        context
-            .measurements
-            .measure(format!("Measurement {i}"))
-            .set_str(format!("Value {i}"))?;
+impl Suite {
+    fn new() -> Self {
+        Self {}
     }
 
-    Ok(())
+    fn test1(&mut self, context: &mut SysContext) -> Result<(), TestFailure> {
+        context.dut.set_via_operator(&mut context.text_input)?;
+
+        for i in 0..20 {
+            context
+                .measurements
+                .measure(format!("Measurement {i}"))
+                .set_str(format!("Value {i}"))?;
+        }
+
+        let input = context.text_input.request("The answer is 'Test'")?;
+
+        info!("{}", input);
+
+        oxidehtf::assert_eq!(input, "Test");
+
+        Ok(())
+    }
+
+    fn test2(&mut self, context: &mut SysContext) -> Result<(), TestFailure> {
+        let input = context.text_input.request("The answer is 'Hello'")?;
+
+        info!("{}", input);
+
+        oxidehtf::assert_eq!(input, "Hello");
+
+        Ok(())
+    }
 }
 
-fn test2_with_longer_name(
-    context: &mut SysContext,
-    _fixture: &mut Fixture,
-) -> Result<(), oxidehtf::TestFailure> {
-    let input = context.text_input.request("The answer is 'Hello'")?;
+impl TestLifecycle for Suite {}
 
-    info!("{}", input);
+impl SuiteProducer for Suite {
+    fn get_suite_name(&self) -> &'static str {
+        "suite1"
+    }
 
-    oxidehtf::assert_eq!(input, "Hello");
+    fn get_tests(&self) -> Vec<(&'static str, DynTestFn)> {
+        let mut tests: Vec<(&'static str, DynTestFn)> = Vec::new();
 
-    Ok(())
+        tests.push((
+            "test1",
+            Box::new(|suite_dyn, context| {
+                let any_suite_dyn: &mut dyn Any = suite_dyn;
+                let suite = any_suite_dyn
+                    .downcast_mut::<Suite>()
+                    .expect("Failed to downcast suite to Suite");
+                suite.test1(context)
+            }),
+        ));
+
+        tests.push((
+            "test2",
+            Box::new(|suite_dyn, context| {
+                let any_suite_dyn: &mut dyn Any = suite_dyn;
+                let suite = any_suite_dyn
+                    .downcast_mut::<Suite>()
+                    .expect("Failed to downcast suite to Suite");
+                suite.test2(context)
+            }),
+        ));
+
+        tests
+    }
 }
 
-fn create_suite_1() -> oxidehtf::TestSuiteBuilder {
-    oxidehtf::TestSuiteBuilder::new(
-        vec![test1, test2_with_longer_name],
-        fixture,
-        vec!["test1", "test2"],
-        "Suite1",
-        1,
-    )
+fn make_executor() -> Box<dyn SuiteProducer> {
+    Box::new(Suite::new())
 }
 
-fn create_suite_2() -> oxidehtf::TestSuiteBuilder {
-    oxidehtf::TestSuiteBuilder::new(
-        vec![test1, test2_with_longer_name],
-        fixture,
-        vec!["test1", "test2"],
-        "Suite2",
-        1,
-    )
-}
-
-inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_1)
-}
-
-inventory::submit! {
-    oxidehtf::TestSuiteBuilderProducer::new(create_suite_2)
-}
+inventory::submit!(SuiteProducerGenerator {
+    func: make_executor,
+    prio: 0
+});
 
 fn main() -> Result<()> {
     oxidehtf::run_tests()

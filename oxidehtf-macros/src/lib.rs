@@ -1,12 +1,10 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
-use syn::{FnArg, ItemFn, ItemMod, LitInt, PatType, ReturnType, Type, parse};
+use syn::{FnArg, Ident, ItemImpl, LitInt, ReturnType, Type, parse};
 
 enum FuncKind {
     None,
     Test,
-    FixtureInit,
 }
 
 #[proc_macro_attribute]
@@ -17,40 +15,32 @@ pub fn tests(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-fn check_fn_sig(sig: &syn::Signature) -> Result<(), ()> {
-    if sig.constness.is_none()
+fn check_test_fun_sig(sig: &syn::Signature) -> bool {
+    sig.constness.is_none()
         && sig.asyncness.is_none()
         && sig.unsafety.is_none()
         && sig.abi.is_none()
         && sig.generics.params.is_empty()
         && sig.generics.where_clause.is_none()
         && sig.variadic.is_none()
-    {
-        Ok(())
-    } else {
-        Err(())
-    }
 }
 
-fn check_fixture_type(arg_type: Box<Type>, fixture_type: Box<Type>) -> bool {
-    match *arg_type {
-        Type::Reference(ry) if ry.mutability.is_some() => match (*ry.elem, *fixture_type) {
-            (Type::Path(arg), Type::Path(fixture)) if arg == fixture => true,
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
-// macro_rules! fn_state_signature_msg {
-//     ($name:literal) => {
-//         concat!(
-//             "`#[",
-//             $name,
-//             "]` function must have signature `fn()` or `fn(state: &mut T)`"
-//         )
-//     };
+// fn check_fixture_type(arg_type: Box<Type>, fixture_type: Box<Type>) -> bool {
+//     match *arg_type {
+//         Type::Reference(ry) if ry.mutability.is_some() => match (*ry.elem, *fixture_type) {
+//             (Type::Path(arg), Type::Path(fixture)) if arg == fixture => true,
+//             _ => false,
+//         },
+//         _ => false,
+//     }
 // }
+
+fn get_suite_type(item_impl: ItemImpl) -> Ident {
+    match *item_impl.self_ty {
+        Type::Path(type_path) => type_path.path.segments.last().unwrap().ident.clone(),
+        _ => panic!("No"),
+    }
+}
 
 fn tests_impl(args: TokenStream, input: TokenStream) -> parse::Result<TokenStream> {
     let mut value: usize = 0; // Default value if no input is present
@@ -77,30 +67,18 @@ fn tests_impl(args: TokenStream, input: TokenStream) -> parse::Result<TokenStrea
         }
     }
 
-    // let test_return_type: Type = parse_quote! { Result<(), oxidehtf::TestFailure> };
-
-    let mut module: ItemMod = syn::parse(input)?;
-    let mut fixture_init: Option<ItemFn> = None;
-    let mod_name = &module.ident;
+    let mut implm: ItemImpl = syn::parse(input)?;
+    let suite_ident = get_suite_type(implm.clone());
+    let suite_name = suite_ident.to_string();
     let mut test_functions = Vec::new();
-    let mut processed_items = Vec::new();
 
-    if let Some((brace, items)) = module.content.take() {
-        for item in items {
-            let syn::Item::Fn(mut func) = item else {
-                processed_items.push(item);
-                continue;
-            };
-
+    for item in &mut implm.items {
+        if let syn::ImplItem::Fn(func) = item {
             let mut func_kind = FuncKind::None;
 
-            // Filter out the #[test] attribute
             func.attrs.retain(|attr| {
                 if attr.path().is_ident("test") {
                     func_kind = FuncKind::Test;
-                    false
-                } else if attr.path().is_ident("fixture") {
-                    func_kind = FuncKind::FixtureInit;
                     false
                 } else {
                     true
@@ -109,147 +87,96 @@ fn tests_impl(args: TokenStream, input: TokenStream) -> parse::Result<TokenStrea
 
             match func_kind {
                 FuncKind::Test => {
-                    let has_return_type = match &func.sig.output {
-                        ReturnType::Type(_, _) => true,
-                        _ => false,
-                    };
-
-                    if check_fn_sig(&func.sig).is_err() || !has_return_type {
-                        return Err(parse::Error::new(
-                            func.sig.ident.span(),
-                            "`#[test]` function must have signature `fn(&mut SysContext, &mut T) -> Result<(), TestFailure>`",
-                        ));
-                    }
-                    test_functions.push(func.clone());
-                    processed_items.push(syn::Item::Fn(func));
-                }
-
-                FuncKind::FixtureInit => {
-                    if fixture_init.is_some() {
-                        return Err(parse::Error::new(
-                            func.sig.ident.span(),
-                            "only a single `#[fixture]` function can be defined",
-                        ));
-                    }
+                    let error = Err(parse::Error::new(
+                        func.sig.ident.span(),
+                        "`#[test]` function must have signature `fn(&mut self, &mut SysContext) -> Result<(), TestFailure>`",
+                    ));
 
                     let has_return_type = match &func.sig.output {
                         ReturnType::Type(_, _) => true,
                         _ => false,
                     };
 
-                    if check_fn_sig(&func.sig).is_err()
-                        || !func.sig.inputs.is_empty()
-                        || !has_return_type
-                    {
-                        return Err(parse::Error::new(
-                            func.sig.ident.span(),
-                            "`#[fixture]` function must have signature `fn() -> T`",
-                        ));
+                    if func.sig.inputs.len() != 2 {
+                        return error;
                     }
 
-                    fixture_init = Some(func.clone());
+                    let Some(first_input) = &func.sig.inputs.first() else {
+                        return error;
+                    };
 
-                    processed_items.push(syn::Item::Fn(func));
+                    let has_self = match first_input {
+                        FnArg::Receiver(r) => r.mutability.is_some() && r.reference.is_some(),
+                        _ => false,
+                    };
+
+                    if !check_test_fun_sig(&func.sig) || !has_return_type || !has_self {
+                        return error;
+                    }
+
+                    let ident = func.sig.ident.clone();
+                    test_functions.push(ident);
                 }
+
                 _ => (),
             }
         }
-        module.content = Some((brace, processed_items));
     }
 
-    let fixture_init_ident = if let Some(fixture_init) = fixture_init.clone() {
-        let sig = fixture_init.sig.ident;
-        Some(quote!(#sig))
-    } else {
-        return Err(parse::Error::new(
-            mod_name.span(),
-            "Suites require an fixture (but can be empty)",
-        ));
-    };
+    let test_entries = test_functions.iter().map(|func| {
+        let name = func.to_string();
+        quote! {
+            (
+                #name,
+                Box::new(|suite_dyn, context| {
+                    let any_suite_dyn: &mut dyn Any = suite_dyn;
+                    let suite = any_suite_dyn
+                        .downcast_mut::<#suite_ident>()
+                        .expect(&format!("Failed to downcast to {}", #suite_name));
+                    suite.#func(context)
+                }),
+            )
+        }
+    });
 
-    let test_functions_pointers: Vec<proc_macro2::TokenStream> = test_functions
-        .iter()
-        .map(|f| {
-            let func_name = f.sig.ident.clone();
-            quote! {#func_name}
-        })
-        .collect();
+    let producer_impl = quote! {
 
-    let test_functions_names: Vec<proc_macro2::TokenStream> = test_functions
-        .iter()
-        .map(|f| {
-            let func_name = f.sig.ident.clone();
-            quote! {stringify!(#func_name)}.into()
-        })
-        .collect();
+        impl oxidehtf::SuiteProducer for #suite_ident {
 
-    let fixture_type = match fixture_init.unwrap().sig.output {
-        ReturnType::Default => None,
-        ReturnType::Type(_, t) => Some(t),
-    };
+            fn get_suite_name(&self) -> &'static str {
+                #suite_name
+            }
 
-    for func in test_functions {
-        let Some(arg) = func.sig.inputs.get(1) else {
-            return Err(parse::Error::new(
-                func.sig.ident.span(),
-                "Second arg in each test must be a &mut of the `#[fixture]` return type",
-            ));
-        };
-
-        let does_type_match = |arg: &PatType| -> bool {
-            check_fixture_type(arg.ty.clone(), fixture_type.clone().unwrap())
-        };
-
-        match arg {
-            FnArg::Typed(p) if does_type_match(p) => (),
-            _ => {
-                return Err(parse::Error::new(
-                    func.sig.ident.span(),
-                    "Second arg in each test must be a &mut of the `#[fixture]` return type",
-                ));
+            fn get_tests(&self) -> Vec<(&'static str, oxidehtf::DynTestFn)> {
+                use std::any::Any;
+                vec![#(#test_entries),*]
             }
         }
-    }
+    };
+
+    let function_name = Ident::new(
+        &format!("__suite_gen_{}", suite_name),
+        proc_macro2::Span::call_site(),
+    );
 
     let register = quote! {
-        fn create_suite_inventory() -> oxidehtf::TestSuiteBuilder {
-            oxidehtf::TestSuiteBuilder::new(
-                vec![#(#test_functions_pointers),*],
-                crate::#mod_name::#fixture_init_ident,
-                vec![#(#test_functions_names),*],
-                stringify!(#mod_name),
-                #value)
+        fn #function_name() -> Box<dyn oxidehtf::SuiteProducer> {
+            Box::new(#suite_ident::new())
         }
 
-        inventory::submit!{
-            oxidehtf::TestSuiteBuilderProducer::new(create_suite_inventory)
-        }
-
+        inventory::submit!(oxidehtf::SuiteProducerGenerator {
+            func: #function_name,
+            prio: #value
+        });
     };
 
-    struct ItemsParser {
-        items: Vec<syn::Item>,
-    }
+    let expanded = quote! {
+        #implm
 
-    impl syn::parse::Parse for ItemsParser {
-        fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-            let mut items = Vec::new();
-            while !input.is_empty() {
-                items.push(input.parse()?);
-            }
-            Ok(ItemsParser { items })
-        }
-    }
+        #producer_impl
 
-    let parsed_items_wrapper: ItemsParser =
-        syn::parse2(register).expect("Failed to parse TokenStream into multiple Items");
+        #register
+    };
 
-    module
-        .content
-        .as_mut()
-        .expect("Content should be present")
-        .1
-        .extend(parsed_items_wrapper.items);
-
-    Ok(quote! {#module}.into())
+    Ok(expanded.into())
 }

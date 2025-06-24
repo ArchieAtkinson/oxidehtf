@@ -1,5 +1,0 @@
-error: Second arg in each test must be a &mut of the `#[fixture]` return type
-  --> tests/macro/incorrect_fixture_type.rs:16:8
-   |
-16 |     fn test1(_context: &mut SysContext, _fixture: &mut u32) -> Result<(), TestFailure> {
-   |        ^^^^^

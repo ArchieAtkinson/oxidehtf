@@ -10,11 +10,12 @@ pub(crate) mod ui;
 use common::*;
 
 pub use test_runner::context::measurement::Unit;
+pub use test_runner::executer::DynTestFn;
+pub use test_runner::SuiteProducer;
+pub use test_runner::SuiteProducerGenerator;
 pub use test_runner::SysContext;
 pub use test_runner::TestFailure;
 pub use test_runner::TestLifecycle;
-pub use test_runner::TestSuiteBuilder;
-pub use test_runner::TestSuiteBuilderProducer;
 
 #[macro_export]
 macro_rules! assert_eq {

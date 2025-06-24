@@ -1,5 +1,0 @@
-error: Suites require an fixture (but can be empty)
- --> tests/macro/no_fixture.rs:2:5
-  |
-2 | mod suite {
-  |     ^^^^^

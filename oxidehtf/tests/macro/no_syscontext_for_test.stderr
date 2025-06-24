@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> tests/macro/no_syscontext_for_test.rs:6:1
+   |
+6  | #[oxidehtf_macros::tests]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `&mut SysContext`
+...
+13 |     fn test1(&mut self, _foo: u32) -> Result<(), TestFailure> {
+   |        ----- arguments to this method are incorrect
+   |
+note: method defined here
+  --> tests/macro/no_syscontext_for_test.rs:13:8
+   |
+13 |     fn test1(&mut self, _foo: u32) -> Result<(), TestFailure> {
+   |        ^^^^^            ---------
+   = note: this error originates in the attribute macro `oxidehtf_macros::tests` (in Nightly builds, run with -Z macro-backtrace for more info)

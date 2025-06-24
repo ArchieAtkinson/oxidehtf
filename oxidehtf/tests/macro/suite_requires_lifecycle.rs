@@ -1,5 +1,5 @@
 use oxidehtf::SysContext;
-use oxidehtf::TestLifecycle;
+use oxidehtf::TestFailure;
 
 struct Suite {}
 
@@ -10,12 +10,10 @@ impl Suite {
     }
 
     #[test]
-    fn test1(&mut self, _context: &mut SysContext) -> Result<(), u32> {
+    fn test1(&mut self, _context: &mut SysContext) -> Result<(), TestFailure> {
         Ok(())
     }
 }
-
-impl TestLifecycle for Suite {}
 
 fn main() -> color_eyre::eyre::Result<()> {
     oxidehtf::run_tests()

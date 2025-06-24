@@ -2,8 +2,9 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     common::*,
-    test_runner::{data::suite::SuiteDataCollection, SuiteData, SuiteExecuter},
-    TestSuiteBuilder, TestSuiteBuilderProducer,
+    test_runner::{
+        data::suite::SuiteDataCollection, SuiteData, SuiteProducer, SuiteProducerGenerator,
+    },
 };
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -49,14 +50,23 @@ impl App {
         let (event_tx, event_rx) = unbounded_channel();
         let (to_test_runner_tx, to_test_runner_rx) = unbounded_channel();
 
-        let mut builders = inventory::iter::<TestSuiteBuilderProducer>
+        let mut builders = inventory::iter::<SuiteProducerGenerator>
             .into_iter()
-            .map(|f| ((*f).func)())
-            .collect::<Vec<TestSuiteBuilder>>();
-        builders.sort_by(|a, b| a.data.priority.cmp(&b.data.priority));
+            .collect::<Vec<&SuiteProducerGenerator>>();
 
-        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteExecuter>>) =
-            builders.into_iter().map(|f| (f.data, f.executer)).collect();
+        builders.sort_by(|a, b| a.prio.cmp(&b.prio));
+
+        let (data, executors): (Vec<SuiteData>, Vec<Box<dyn SuiteProducer>>) = builders
+            .iter()
+            .map(|p| {
+                let executor = (p.func)();
+                let names = executor.get_tests().iter().map(|t| t.0).collect();
+                (
+                    SuiteData::new(names, executor.get_suite_name(), p.prio),
+                    executor,
+                )
+            })
+            .collect();
 
         let suites_collection = SuiteDataCollection::new(data, event_tx.clone());
 
@@ -173,7 +183,6 @@ impl App {
                 _ => None,
             },
             Event::UserInputPrompt(ref s, ref mut c) => {
-                info!("HERE");
                 let channel = c.take();
                 Some(Action::UserInputPrompt(s.clone(), channel))
             }

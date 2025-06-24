@@ -1,4 +1,4 @@
-use oxidehtf::SysContext;
+use oxidehtf::TestFailure;
 use oxidehtf::TestLifecycle;
 
 struct Suite {}
@@ -10,7 +10,7 @@ impl Suite {
     }
 
     #[test]
-    fn test1(&mut self, _context: &mut SysContext) -> Result<(), u32> {
+    fn test1(_context: &mut SysContext) -> Result<(), TestFailure> {
         Ok(())
     }
 }

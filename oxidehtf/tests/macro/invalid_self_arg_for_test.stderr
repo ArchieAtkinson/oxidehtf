@@ -1,0 +1,13 @@
+error: `#[test]` function must have signature `fn(&mut self, &mut SysContext) -> Result<(), TestFailure>`
+  --> tests/macro/invalid_self_arg_for_test.rs:13:8
+   |
+13 |     fn test1(&self, _context: &mut SysContext) -> Result<(), TestFailure> {
+   |        ^^^^^
+
+warning: unused import: `oxidehtf::TestFailure`
+ --> tests/macro/invalid_self_arg_for_test.rs:1:5
+  |
+1 | use oxidehtf::TestFailure;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default

@@ -1,0 +1,11 @@
+error[E0277]: the trait bound `Suite: TestLifecycle` is not satisfied
+ --> tests/macro/suite_requires_lifecycle.rs:7:6
+  |
+7 | impl Suite {
+  |      ^^^^^ the trait `TestLifecycle` is not implemented for `Suite`
+  |
+note: required by a bound in `SuiteProducer`
+ --> src/test_runner/executer.rs
+  |
+  | pub trait SuiteProducer: TestLifecycle + Send + Sync + Any {
+  |                          ^^^^^^^^^^^^^ required by this bound in `SuiteProducer`

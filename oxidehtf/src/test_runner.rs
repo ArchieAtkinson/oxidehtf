@@ -15,46 +15,14 @@ use data::suite::SuiteDataCollection;
 pub use data::suite::SuiteDataCollectionRaw;
 pub use data::{TestDone, TestRunning, TestState};
 pub use errors::TestFailure;
-pub use executer::SuiteExecuter;
-pub use executer::SuiteExecuterHolder;
+pub use executer::SuiteProducer;
+pub use executer::SuiteProducerGenerator;
 pub use lifecycle::TestLifecycle;
 
-pub type FuncType<T> = fn(&mut SysContext, &mut T) -> Result<(), TestFailure>;
-
-pub struct TestSuiteBuilderProducer {
-    pub(crate) func: fn() -> TestSuiteBuilder,
-}
-
-impl TestSuiteBuilderProducer {
-    pub const fn new(func: fn() -> TestSuiteBuilder) -> Self {
-        Self { func }
-    }
-}
-
-pub struct TestSuiteBuilder {
-    pub(crate) executer: Box<dyn SuiteExecuter>,
-    pub(crate) data: SuiteData,
-}
-
-impl TestSuiteBuilder {
-    pub fn new<T: TestLifecycle>(
-        funcs: Vec<FuncType<T>>,
-        fixture_init: fn() -> T,
-        names: Vec<&'static str>,
-        suite_name: &'static str,
-        priority: usize,
-    ) -> Self {
-        Self {
-            executer: Box::new(SuiteExecuterHolder::new(funcs, fixture_init)),
-            data: SuiteData::new(names, suite_name, priority),
-        }
-    }
-}
-
-inventory::collect!(TestSuiteBuilderProducer);
+inventory::collect!(SuiteProducerGenerator);
 
 pub struct TestRunner {
-    executor: Vec<Box<dyn SuiteExecuter>>,
+    executor: Vec<Box<dyn SuiteProducer>>,
     data: SuiteDataCollection,
     event_tx: UnboundedSender<Event>,
     context: SysContext,
@@ -63,7 +31,7 @@ pub struct TestRunner {
 
 impl TestRunner {
     pub fn new(
-        executor: Vec<Box<dyn SuiteExecuter>>,
+        executor: Vec<Box<dyn SuiteProducer>>,
         data: SuiteDataCollection,
         event_tx: UnboundedSender<Event>,
         from_app_rx: UnboundedReceiver<Action>,
@@ -97,11 +65,11 @@ impl TestRunner {
 
             self.data.data.blocking_write().current = suite_index;
 
-            self.executor[suite_index].fixture_init();
+            let tests = self.executor[suite_index].get_tests();
 
             self.data.blocking_write(|f| f.set_suite_start_time())?;
 
-            self.executor[suite_index].fixture().setup()?;
+            self.executor[suite_index].setup()?;
 
             let test_num = self
                 .data
@@ -116,11 +84,11 @@ impl TestRunner {
                 })?;
 
                 info!("Starting Test: {}", test_name);
-                self.executor[suite_index].fixture().before_test()?;
+                self.executor[suite_index].before_test()?;
                 let start_time = Instant::now();
-                let result = self.executor[suite_index].run_test(index, &mut self.context);
+                let result = tests[index].1(self.executor[suite_index].as_mut(), &mut self.context);
                 let test_duration = Instant::now() - start_time;
-                self.executor[suite_index].fixture().after_test()?;
+                self.executor[suite_index].after_test()?;
 
                 let final_state = match result {
                     Ok(_) => TestState::Done(TestDone::Passed),
@@ -136,7 +104,7 @@ impl TestRunner {
 
             self.event_tx.send(Event::TestsCompleted)?;
 
-            self.executor[suite_index].fixture().teardown()?;
+            self.executor[suite_index].teardown()?;
 
             info!("Done");
         }

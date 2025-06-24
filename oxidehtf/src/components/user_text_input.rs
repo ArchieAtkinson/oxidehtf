@@ -115,10 +115,6 @@ impl Component for UserTextInput {
             Action::UserInputPrompt(v, ref mut c) => {
                 self.prompt = v.clone();
                 self.reply = c.take();
-                if self.reply.is_none() {
-                    info!("NONE");
-                }
-                info!("HERE");
             }
             _ => (),
         }
