@@ -41,20 +41,20 @@ impl Screen for WelcomeScreen {
         components.remove(&Id::WelcomeSuites);
     }
 
-    fn focus_next(&mut self, current_focus: Id) -> Id {
-        match current_focus {
+    fn focus_next(&mut self, current_focus: &Id) -> Option<Id> {
+        Some(match current_focus {
             Id::WelcomeIntro => Id::WelcomeSuites,
             Id::WelcomeSuites => Id::WelcomeIntro,
             _ => panic!("Can't focus next from unknown ID"),
-        }
+        })
     }
 
-    fn focus_previous(&mut self, current_focus: Id) -> Id {
-        match current_focus {
+    fn focus_previous(&mut self, current_focus: &Id) -> Option<Id> {
+        Some(match current_focus {
             Id::WelcomeIntro => Id::WelcomeSuites,
             Id::WelcomeSuites => Id::WelcomeIntro,
             _ => panic!("Can't focus next from unknown ID"),
-        }
+        })
     }
 
     fn draw(

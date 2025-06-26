@@ -66,20 +66,20 @@ impl Screen for RunningScreen {
         components.remove(&Id::RunningCompletedTests);
     }
 
-    fn focus_next(&mut self, current_focus: Id) -> Id {
-        match current_focus {
+    fn focus_next(&mut self, current_focus: &Id) -> Option<Id> {
+        Some(match current_focus {
             Id::RunningTextInput => Id::RunningCurrentTest,
             Id::RunningCurrentTest => Id::RunningTextInput,
             _ => panic!("Can't focus next from unknown ID"),
-        }
+        })
     }
 
-    fn focus_previous(&mut self, current_focus: Id) -> Id {
-        match current_focus {
+    fn focus_previous(&mut self, current_focus: &Id) -> Option<Id> {
+        Some(match current_focus {
             Id::RunningTextInput => Id::RunningCurrentTest,
             Id::RunningCurrentTest => Id::RunningTextInput,
             _ => panic!("Can't focus next from unknown ID"),
-        }
+        })
     }
 
     fn draw(

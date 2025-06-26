@@ -6,6 +6,7 @@ use ratatui::Frame;
 
 pub mod components;
 pub mod running;
+pub mod summary;
 pub mod welcome;
 
 pub trait Screen {
@@ -13,8 +14,8 @@ pub trait Screen {
     fn name(&self) -> &str;
     fn activate(&mut self, components: &mut HashMap<Id, Box<dyn Component>>) -> Option<Id>;
     fn deactivate(&mut self, components: &mut HashMap<Id, Box<dyn Component>>);
-    fn focus_next(&mut self, current_focus: Id) -> Id;
-    fn focus_previous(&mut self, current_focus: Id) -> Id;
+    fn focus_next(&mut self, current_focus: &Id) -> Option<Id>;
+    fn focus_previous(&mut self, current_focus: &Id) -> Option<Id>;
     fn draw(
         &mut self,
         frame: &mut Frame,

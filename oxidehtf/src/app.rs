@@ -130,7 +130,7 @@ impl App {
                 Some(Action::UserInputPrompt(s.clone(), channel))
             }
             Event::CurrentSuiteDut(ref s) => Some(Action::SetCurrentSuiteDut(s.clone())),
-
+            Event::TestsCompleted => Some(Action::ChangeScreen(Screens::Summary)),
             // Used to update UI
             Event::NOP => return Ok(()),
             _ => None,
@@ -179,7 +179,7 @@ impl App {
                 }
             }
 
-            self.to_test_runner_tx.send(action)?;
+            let _ = self.to_test_runner_tx.send(action);
         }
 
         Ok(())

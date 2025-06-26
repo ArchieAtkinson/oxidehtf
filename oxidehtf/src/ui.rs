@@ -4,6 +4,7 @@ use ratatui::{prelude::CrosstermBackend, Terminal};
 use screens::{
     components::{Attribute, Component},
     running::RunningScreen,
+    summary::SummaryScreen,
     welcome::WelcomeScreen,
     Screen,
 };
@@ -18,6 +19,7 @@ pub enum Screens {
     #[default]
     Welcome,
     RunningTests,
+    Summary,
 }
 
 pub struct Ui {
@@ -46,6 +48,10 @@ impl Ui {
                 (
                     Screens::RunningTests,
                     Box::new(RunningScreen::new()) as Box<dyn Screen>,
+                ),
+                (
+                    Screens::Summary,
+                    Box::new(SummaryScreen::new()) as Box<dyn Screen>,
                 ),
             ]),
             current_focus: Some(Id::WelcomeIntro),
@@ -93,53 +99,43 @@ impl Ui {
                 .unwrap();
         }
 
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(true)),
-        );
+        if let Some(ref current) = self.current_focus.clone() {
+            self.set_attr(current, Attribute::Focus(Some(true)));
+        }
     }
 
     pub fn focus_next(&mut self) {
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(false)),
-        );
-
-        self.current_focus = Some(
-            self.screens
+        if let Some(current) = self.current_focus.clone() {
+            self.set_attr(&current, Attribute::Focus(Some(false)));
+            self.current_focus = self
+                .screens
                 .get_mut(&self.current_screen)
                 .unwrap()
-                .focus_next(self.current_focus.clone().unwrap()),
-        );
-
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(true)),
-        );
+                .focus_next(&current);
+            self.set_attr(&current, Attribute::Focus(Some(false)));
+        }
     }
 
     pub fn focus_previous(&mut self) {
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(false)),
-        );
+        if let Some(current) = self.current_focus.clone() {
+            self.set_attr(&current, Attribute::Focus(Some(false)));
 
-        self.current_focus = Some(
-            self.screens
+            self.current_focus = self
+                .screens
                 .get_mut(&self.current_screen)
                 .unwrap()
-                .focus_previous(self.current_focus.clone().unwrap()),
-        );
+                .focus_previous(&current);
 
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(true)),
-        );
+            self.set_attr(&current, Attribute::Focus(Some(true)));
+        }
     }
 
     pub fn focused_component(&mut self) -> Option<&mut Box<dyn Component>> {
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
+        if let Some(current) = self.current_focus.clone() {
+            Some(self.components.get_mut(&current).unwrap())
+        } else {
+            None
+        }
     }
 
     fn active_screen(&mut self, screen: Screens) {
@@ -151,17 +147,15 @@ impl Ui {
             .unwrap()
             .activate(&mut self.components);
 
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(true)),
-        );
+        if let Some(ref current) = self.current_focus.clone() {
+            self.set_attr(current, Attribute::Focus(Some(true)));
+        }
     }
 
     fn deactivate_screen(&mut self, screen: Screens) {
-        self.set_attr(
-            self.current_focus.clone().unwrap(),
-            Attribute::Focus(Some(false)),
-        );
+        if let Some(ref current) = self.current_focus.clone() {
+            self.set_attr(current, Attribute::Focus(Some(false)));
+        }
 
         self.screens
             .get_mut(&screen)
@@ -169,12 +163,8 @@ impl Ui {
             .deactivate(&mut self.components);
     }
 
-    fn set_attr(&mut self, id: Id, attr: Attribute) {
-        self.components
-            .get_mut(&id)
-            .unwrap()
-            .set_attr(attr)
-            .unwrap();
+    fn set_attr(&mut self, id: &Id, attr: Attribute) {
+        self.components.get_mut(id).unwrap().set_attr(attr).unwrap();
     }
 
     pub fn render(&mut self, mut data: SuiteDataCollectionRaw) -> Result<()> {
