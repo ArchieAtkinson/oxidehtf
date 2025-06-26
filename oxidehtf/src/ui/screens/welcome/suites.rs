@@ -55,12 +55,7 @@ impl SuitesDisplay {
         *offset = (*offset).clamp(0 as usize, max_offset);
     }
 
-    fn render_current_test(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        data: &SuiteDataCollectionRaw,
-    ) {
+    fn render_suites(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataCollectionRaw) {
         // 2 for border, 1 for header = 3
         self.current_rows_seen = usize::from(area.height) - 3;
         let mut rows = Vec::new();
@@ -69,7 +64,8 @@ impl SuitesDisplay {
             let name = suite.name.to_string();
             let priority = suite.priority.to_string();
             let position = (index + 1).to_string();
-            let row = vec![position, name, priority];
+            let num_tests = suite.test_data.len().to_string();
+            let row = vec![position, name, priority, num_tests];
             rows.push(Row::from_iter(row));
         }
 
@@ -77,9 +73,9 @@ impl SuitesDisplay {
 
         let rows = rows.iter_mut().enumerate().map(|(i, r)| {
             if i % 2 == 0 {
-                r.clone().black().on_gray()
-            } else {
                 r.clone()
+            } else {
+                r.clone().black().on_gray()
             }
         });
 
@@ -90,11 +86,17 @@ impl SuitesDisplay {
         };
 
         // Columns widths are constrained in the same way as Layout...
-        let widths = [Constraint::Min(5), Constraint::Min(5), Constraint::Min(5)];
+        let widths = [
+            Constraint::Min(5),
+            Constraint::Min(5),
+            Constraint::Min(5),
+            Constraint::Min(5),
+        ];
         let table = Table::new(rows, widths)
             .block(Block::bordered().border_style(border_style))
             .header(
-                Row::new(vec!["Run Order", "Name", "Priority"]).style(Style::new().underlined()),
+                Row::new(vec!["Run Order", "Name", "Priority", "No. Tests"])
+                    .style(Style::new().underlined()),
             )
             .highlight_symbol(">>");
 
@@ -156,7 +158,7 @@ impl Component for SuitesDisplay {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataCollectionRaw) -> Result<()> {
         let area = area.inner(Margin::new(area.width / 8, 1));
-        self.render_current_test(frame, area, data);
+        self.render_suites(frame, area, data);
         self.render_scrollbar(frame, area);
         Ok(())
     }
