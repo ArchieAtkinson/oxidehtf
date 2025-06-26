@@ -26,13 +26,11 @@ pub mod suite_progress;
 pub mod user_text_input;
 pub mod waiting_tests;
 
-pub struct RunningScreen {
-    event_tx: UnboundedSender<Event>,
-}
+pub struct RunningScreen {}
 
 impl RunningScreen {
-    pub fn new(event_tx: UnboundedSender<Event>) -> Self {
-        Self { event_tx }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 

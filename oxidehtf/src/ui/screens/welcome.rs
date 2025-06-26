@@ -13,13 +13,11 @@ use suites::SuitesDisplay;
 pub mod intro;
 pub mod suites;
 
-pub struct WelcomeScreen {
-    event_tx: UnboundedSender<Event>,
-}
+pub struct WelcomeScreen {}
 
 impl WelcomeScreen {
-    pub fn new(event_tx: UnboundedSender<Event>) -> Self {
-        Self { event_tx }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 

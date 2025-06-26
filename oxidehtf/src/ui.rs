@@ -41,11 +41,11 @@ impl Ui {
             screens: HashMap::from([
                 (
                     Screens::Welcome,
-                    Box::new(WelcomeScreen::new(event_tx.clone())) as Box<dyn Screen>,
+                    Box::new(WelcomeScreen::new()) as Box<dyn Screen>,
                 ),
                 (
                     Screens::RunningTests,
-                    Box::new(RunningScreen::new(event_tx.clone())) as Box<dyn Screen>,
+                    Box::new(RunningScreen::new()) as Box<dyn Screen>,
                 ),
             ]),
             current_focus: Some(Id::WelcomeIntro),
@@ -54,23 +54,13 @@ impl Ui {
     }
 
     pub fn start(&mut self) {
-        self.current_focus = self
-            .screens
-            .get_mut(&self.current_screen)
-            .unwrap()
-            .activate(&mut self.components);
+        self.active_screen(self.current_screen);
 
         for (_, component) in self.components.iter_mut() {
             component
                 .register_event_handler(self.event_tx.clone())
                 .unwrap();
         }
-
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(true)))
-            .unwrap();
 
         self.event_tx.send(Event::NOP).unwrap();
 
@@ -93,24 +83,9 @@ impl Ui {
     }
 
     pub fn active(&mut self, screen: Screens) {
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(false)))
-            .unwrap();
-
-        self.screens
-            .get_mut(&self.current_screen)
-            .unwrap()
-            .deactivate(&mut self.components);
-
+        self.deactivate_screen(self.current_screen);
         self.focus_stack.clear();
-
-        self.current_focus = self
-            .screens
-            .get_mut(&screen)
-            .unwrap()
-            .activate(&mut self.components);
+        self.active_screen(screen);
 
         for (_, component) in self.components.iter_mut() {
             component
@@ -118,21 +93,17 @@ impl Ui {
                 .unwrap();
         }
 
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(true)))
-            .unwrap();
-
-        self.current_screen = screen;
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(true)),
+        );
     }
 
     pub fn focus_next(&mut self) {
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(false)))
-            .unwrap();
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(false)),
+        );
 
         self.current_focus = Some(
             self.screens
@@ -141,19 +112,17 @@ impl Ui {
                 .focus_next(self.current_focus.clone().unwrap()),
         );
 
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(true)))
-            .unwrap();
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(true)),
+        );
     }
 
     pub fn focus_previous(&mut self) {
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(false)))
-            .unwrap();
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(false)),
+        );
 
         self.current_focus = Some(
             self.screens
@@ -162,16 +131,50 @@ impl Ui {
                 .focus_previous(self.current_focus.clone().unwrap()),
         );
 
-        self.components
-            .get_mut(&self.current_focus.clone().unwrap())
-            .unwrap()
-            .set_attr(Attribute::Focus(Some(true)))
-            .unwrap();
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(true)),
+        );
     }
 
     pub fn focused_component(&mut self) -> Option<&mut Box<dyn Component>> {
         self.components
             .get_mut(&self.current_focus.clone().unwrap())
+    }
+
+    fn active_screen(&mut self, screen: Screens) {
+        self.current_screen = screen;
+
+        self.current_focus = self
+            .screens
+            .get_mut(&screen)
+            .unwrap()
+            .activate(&mut self.components);
+
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(true)),
+        );
+    }
+
+    fn deactivate_screen(&mut self, screen: Screens) {
+        self.set_attr(
+            self.current_focus.clone().unwrap(),
+            Attribute::Focus(Some(false)),
+        );
+
+        self.screens
+            .get_mut(&screen)
+            .unwrap()
+            .deactivate(&mut self.components);
+    }
+
+    fn set_attr(&mut self, id: Id, attr: Attribute) {
+        self.components
+            .get_mut(&id)
+            .unwrap()
+            .set_attr(attr)
+            .unwrap();
     }
 
     pub fn render(&mut self, mut data: SuiteDataCollectionRaw) -> Result<()> {
