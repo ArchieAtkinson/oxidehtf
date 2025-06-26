@@ -56,8 +56,7 @@ impl TestRunner {
             }
         }
 
-        let suite_num = self.data.data.blocking_read().inner.len();
-        for suite_index in 0..suite_num {
+        for (suite_index, executor) in self.executor.iter_mut().enumerate() {
             info!(
                 "Starting Suite: {}",
                 self.data.data.blocking_read().inner[suite_index].name
@@ -65,30 +64,25 @@ impl TestRunner {
 
             self.data.data.blocking_write().current = suite_index;
 
-            let tests = self.executor[suite_index].get_tests();
-
             self.data.blocking_write(|f| f.set_suite_start_time())?;
 
-            self.executor[suite_index].setup()?;
+            executor.setup()?;
 
-            let test_num = self
-                .data
-                .blocking_read(|f| Ok(f.current_suite().get_test_amount()))?;
-
-            for index in 0..test_num {
-                let test_name = self.data.blocking_write(|f| {
-                    f.current_suite_mut().update_test_index(index);
+            for (test_index, (name, test)) in executor.get_tests().iter_mut().enumerate() {
+                self.data.blocking_write(|f| {
+                    f.current_suite_mut().update_test_index(test_index);
                     f.current_suite_mut().current_test_mut().state =
                         TestState::Running(TestRunning::Running);
-                    Ok(f.current_suite().current_test().name)
+                    Ok(())
                 })?;
 
-                info!("Starting Test: {}", test_name);
-                self.executor[suite_index].before_test()?;
+                info!("Starting Test: {}", name);
+
+                executor.before_test()?;
                 let start_time = Instant::now();
-                let result = tests[index].1(self.executor[suite_index].as_mut(), &mut self.context);
+                let result = test(executor.as_mut(), &mut self.context);
                 let test_duration = Instant::now() - start_time;
-                self.executor[suite_index].after_test()?;
+                executor.after_test()?;
 
                 let final_state = match result {
                     Ok(_) => TestState::Done(TestDone::Passed),
@@ -104,7 +98,7 @@ impl TestRunner {
 
             self.event_tx.send(Event::TestsCompleted)?;
 
-            self.executor[suite_index].teardown()?;
+            executor.teardown()?;
 
             info!("Done");
         }

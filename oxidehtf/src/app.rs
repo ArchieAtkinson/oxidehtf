@@ -1,21 +1,14 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use crate::{
     common::*,
     test_runner::{
         data::suite::SuiteDataCollection, SuiteData, SuiteProducer, SuiteProducerGenerator,
+        TestDone, TestRunner, TestState,
     },
+    ui::{Screens, Ui},
 };
 use crossterm::event::{KeyCode, KeyModifiers};
-
-use crate::{
-    components::{
-        CompletedTestDisplay, Component, CurrentTestDisplay, SuiteProgressDisplay, UserTextInput,
-        WaitingTestDisplay, WeclomeDisplay,
-    },
-    test_runner::{TestDone, TestRunner, TestState},
-    ui::Ui,
-};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AppState {
@@ -24,25 +17,25 @@ pub enum AppState {
     Done,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Screen {
-    #[default]
-    Welcome,
-    RunningTests,
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub enum Id {
+    WelcomeIntro,
+    WelcomeSuites,
+    RunningSuiteProgress,
+    RunningTextInput,
+    RunningCurrentTest,
+    RunningCompletedTests,
+    RunningWaitingTests,
 }
 
 pub struct App {
     ui: Ui,
     state: AppState,
     suites_data: SuiteDataCollection,
-    components: HashMap<Screen, Vec<Box<dyn Component>>>,
     test_runner: Option<TestRunner>,
-    current_focus: usize,
-    current_screen: Screen,
     actions: VecDeque<Action>,
     to_test_runner_tx: UnboundedSender<Action>,
     event_rx: UnboundedReceiver<Event>,
-    event_tx: UnboundedSender<Event>,
 }
 
 impl App {
@@ -77,59 +70,19 @@ impl App {
             to_test_runner_rx,
         );
 
-        let running_tests_screen: Vec<Box<dyn Component>> = vec![
-            // User text input first to start as focus
-            Box::new(UserTextInput::new()),
-            Box::new(SuiteProgressDisplay::new()),
-            Box::new(WaitingTestDisplay::new()),
-            Box::new(CompletedTestDisplay::new()),
-            Box::new(CurrentTestDisplay::new()),
-        ];
-
-        let welcome_screen: Vec<Box<dyn Component>> = vec![Box::new(WeclomeDisplay::new())];
-
         Ok(Self {
             ui: Ui::new(event_tx.clone()),
             suites_data: suites_collection,
-            components: HashMap::from([
-                (Screen::RunningTests, running_tests_screen),
-                (Screen::Welcome, welcome_screen),
-            ]),
-            test_runner: Some(test_runner),
-            current_focus: 0,
-            current_screen: Screen::Welcome,
             state: Default::default(),
+            test_runner: Some(test_runner),
             actions: VecDeque::new(),
             to_test_runner_tx,
             event_rx,
-            event_tx,
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        for component in self.components.values_mut().flat_map(|v| v.iter_mut()) {
-            component.register_event_handler(self.event_tx.clone())?;
-            component.init()?;
-        }
-
         self.ui.start();
-
-        let current_focus = self.current_focus;
-        self.active_components()?[current_focus].focus();
-
-        let state = self.suites_data.get_raw_copy().await;
-        self.ui.render(|f, a| {
-            for component in self
-                .components
-                .get_mut(&self.current_screen)
-                .ok_or_eyre("Screen not present")?
-                .iter_mut()
-            {
-                component.draw(f, &a, &state)?;
-            }
-            Ok(())
-        })?;
-
         let mut test_runner = self.test_runner.take().ok_or_eyre("No Test Runner")?;
         let mut runner_handle = tokio::task::spawn_blocking(move || test_runner.run());
         let mut is_runner_done = false;
@@ -138,17 +91,7 @@ impl App {
             self.handle_event().await?;
             self.handle_actions().await?;
             let state = self.suites_data.get_raw_copy().await;
-            self.ui.render(|f, a| {
-                for component in self
-                    .components
-                    .get_mut(&self.current_screen)
-                    .ok_or_eyre("Screen not present")?
-                    .iter_mut()
-                {
-                    component.draw(f, &a, &state)?;
-                }
-                Ok(())
-            })?;
+            self.ui.render(state)?;
 
             if !is_runner_done {
                 tokio::select! {
@@ -187,6 +130,9 @@ impl App {
                 Some(Action::UserInputPrompt(s.clone(), channel))
             }
             Event::CurrentSuiteDut(ref s) => Some(Action::SetCurrentSuiteDut(s.clone())),
+
+            // Used to update UI
+            Event::NOP => return Ok(()),
             _ => None,
         };
 
@@ -194,17 +140,11 @@ impl App {
             self.actions.push_back(action);
         }
 
-        for component in self
-            .components
-            .get_mut(&self.current_screen)
-            .ok_or_eyre("Screen not present")?
-            .iter_mut()
-        {
-            if let Some(new_action) = component.handle_events(&event)? {
-                self.actions.push_back(new_action);
+        if let Some(component) = self.ui.focused_component() {
+            if let Some(action) = component.handle_event(&event)? {
+                self.actions.push_back(action);
             }
         }
-
         Ok(())
     }
 
@@ -214,14 +154,13 @@ impl App {
         while let Some(mut action) = self.actions.pop_front() {
             match action {
                 ExitApp => self.state = AppState::Done,
-                FocusNextPane => self.focus_next()?,
-                FocusPreviousPane => self.focus_previous()?,
+                FocusNextPane => self.ui.focus_next(),
+                FocusPreviousPane => self.ui.focus_previous(),
                 ChangeScreen(s) => {
-                    if s == Screen::RunningTests {
+                    if s == Screens::RunningTests {
                         self.actions.push_back(Action::StartTests);
                     }
-                    self.current_screen = s;
-                    self.focus_default()?;
+                    self.ui.active(s);
                 }
                 SetCurrentSuiteDut(ref s) => {
                     self.suites_data
@@ -234,14 +173,9 @@ impl App {
                 _ => (),
             }
 
-            for component in self
-                .components
-                .get_mut(&self.current_screen)
-                .ok_or_eyre("Screen not present")?
-                .iter_mut()
-            {
-                if let Some(new_action) = component.update(&mut action)? {
-                    self.actions.push_back(new_action);
+            if let Some(component) = self.ui.focused_component() {
+                if let Some(action) = component.update(&mut action)? {
+                    self.actions.push_back(action);
                 }
             }
 
@@ -255,76 +189,76 @@ impl App {
         self.state
     }
 
-    fn focus_default(&mut self) -> Result<()> {
-        self.active_components()?[0].focus();
-        self.current_focus = 0;
-        Ok(())
-    }
+    // fn focus_default(&mut self) -> Result<()> {
+    //     self.active_components()?[0].focus();
+    //     self.current_focus = 0;
+    //     Ok(())
+    // }
 
-    fn focus_next(&mut self) -> Result<()> {
-        let current_focus = self.current_focus;
-        self.active_components()?[current_focus].blur();
+    // fn focus_next(&mut self) -> Result<()> {
+    //     let current_focus = self.current_focus;
+    //     self.active_components()?[current_focus].blur();
 
-        let len = self.active_components()?.len();
+    //     let len = self.active_components()?.len();
 
-        let start_search_index = self.current_focus + 1;
-        let mut next_focus_index = 0;
+    //     let start_search_index = self.current_focus + 1;
+    //     let mut next_focus_index = 0;
 
-        let mut found_next_focusable = false;
+    //     let mut found_next_focusable = false;
 
-        for i in 0..len {
-            let index = (start_search_index + i) % len;
-            if self.active_components()?[index].can_focus() {
-                next_focus_index = index;
-                found_next_focusable = true;
-                break;
-            }
-        }
+    //     for i in 0..len {
+    //         let index = (start_search_index + i) % len;
+    //         if self.active_components()?[index].can_focus() {
+    //             next_focus_index = index;
+    //             found_next_focusable = true;
+    //             break;
+    //         }
+    //     }
 
-        if found_next_focusable {
-            self.active_components()?[next_focus_index].focus();
-            self.current_focus = next_focus_index;
-        } else {
-            panic!(
-                "No other focusable components found in the sequence. Current focus remains {}.",
-                self.current_focus
-            );
-        }
-        Ok(())
-    }
+    //     if found_next_focusable {
+    //         self.active_components()?[next_focus_index].focus();
+    //         self.current_focus = next_focus_index;
+    //     } else {
+    //         panic!(
+    //             "No other focusable components found in the sequence. Current focus remains {}.",
+    //             self.current_focus
+    //         );
+    //     }
+    //     Ok(())
+    // }
 
-    fn focus_previous(&mut self) -> Result<()> {
-        let current_focus = self.current_focus;
-        self.active_components()?[current_focus].blur();
+    // fn focus_previous(&mut self) -> Result<()> {
+    //     let current_focus = self.current_focus;
+    //     self.active_components()?[current_focus].blur();
 
-        let len = self.active_components()?.len();
+    //     let len = self.active_components()?.len();
 
-        let start_search_index = self.current_focus;
-        let mut next_focus_index = 0;
+    //     let start_search_index = self.current_focus;
+    //     let mut next_focus_index = 0;
 
-        let mut found_next_focusable = false;
+    //     let mut found_next_focusable = false;
 
-        for i in 0..len {
-            let index = (start_search_index + len - 1 - i) % len;
-            if self.active_components()?[index].can_focus() {
-                next_focus_index = index;
-                found_next_focusable = true;
-                break;
-            }
-        }
+    //     for i in 0..len {
+    //         let index = (start_search_index + len - 1 - i) % len;
+    //         if self.active_components()?[index].can_focus() {
+    //             next_focus_index = index;
+    //             found_next_focusable = true;
+    //             break;
+    //         }
+    //     }
 
-        if found_next_focusable {
-            self.active_components()?[next_focus_index].focus();
-            self.current_focus = next_focus_index;
-        } else {
-            panic!(
-                "No other focusable components found in the sequence. Current focus remains {}.",
-                self.current_focus
-            );
-        }
+    //     if found_next_focusable {
+    //         self.active_components()?[next_focus_index].focus();
+    //         self.current_focus = next_focus_index;
+    //     } else {
+    //         panic!(
+    //             "No other focusable components found in the sequence. Current focus remains {}.",
+    //             self.current_focus
+    //         );
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     async fn produce_junit_report(&self) -> Result<()> {
         use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
@@ -357,11 +291,5 @@ impl App {
         report.serialize(junit_file)?;
 
         Ok(())
-    }
-
-    fn active_components(&mut self) -> Result<&mut Vec<Box<dyn Component>>> {
-        self.components
-            .get_mut(&self.current_screen)
-            .ok_or_eyre("No Screen Present")
     }
 }

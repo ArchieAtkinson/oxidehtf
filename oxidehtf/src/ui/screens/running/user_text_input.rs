@@ -8,13 +8,13 @@ use ratatui::{
 use tokio::sync::oneshot;
 
 use crate::{
-    common::*, event_handlers::TextInputHandler, test_runner::SuiteDataCollectionRaw, ui::UiAreas,
+    common::*, event_handlers::TextInputHandler, test_runner::SuiteDataCollectionRaw,
+    ui::screens::components::Attribute,
 };
 
 use super::Component;
 
 pub struct UserTextInput {
-    event_tx: Option<UnboundedSender<Event>>,
     txt_input: tui_input::Input,
     prompt: String,
     is_focused: bool,
@@ -26,7 +26,6 @@ impl UserTextInput {
 
     pub fn new() -> Self {
         Self {
-            event_tx: Default::default(),
             txt_input: Default::default(),
             prompt: Self::DEFAULT_PROMPT.into(),
             is_focused: false,
@@ -68,24 +67,11 @@ impl UserTextInput {
 }
 
 impl Component for UserTextInput {
-    fn init(&mut self) -> Result<()> {
-        Ok(())
-    }
-
     fn name(&self) -> &str {
         "User Text Input"
     }
 
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
-        self.event_tx = Some(tx.clone());
-        Ok(())
-    }
-
-    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
-        if !self.is_focused {
-            return Ok(None);
-        }
-
+    fn handle_event(&mut self, event: &Event) -> Result<Option<Action>> {
         match event {
             Event::Key(key)
                 if key.code == KeyCode::Enter && key.modifiers == KeyModifiers::NONE =>
@@ -121,26 +107,18 @@ impl Component for UserTextInput {
         Ok(None)
     }
 
-    fn can_focus(&self) -> bool {
-        true
+    fn set_attr(&mut self, attr: Attribute) -> Result<()> {
+        match attr {
+            Attribute::Focus(b) => {
+                self.is_focused = b.unwrap();
+                Ok(())
+            }
+            _ => Err(eyre!("Unknown Attr in {}", self.name())),
+        }
     }
 
-    fn focus(&mut self) {
-        self.is_focused = true;
-    }
-
-    fn blur(&mut self) {
-        self.is_focused = false;
-    }
-
-    fn draw(
-        &mut self,
-        frame: &mut Frame,
-        area: &UiAreas,
-        data: &SuiteDataCollectionRaw,
-    ) -> Result<()> {
-        assert_eq!(area.operator.height, 3);
-        self.draw_input(frame, area.operator, data)?;
+    fn draw(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataCollectionRaw) -> Result<()> {
+        self.draw_input(frame, area, data)?;
 
         Ok(())
     }

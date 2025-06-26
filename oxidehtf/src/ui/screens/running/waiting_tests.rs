@@ -9,7 +9,6 @@ use ratatui::{
 use crate::{
     common::*,
     test_runner::{SuiteDataCollectionRaw, TestState},
-    ui::UiAreas,
 };
 
 use super::Component;
@@ -49,13 +48,8 @@ impl Component for WaitingTestDisplay {
         "Test Status Display"
     }
 
-    fn draw(
-        &mut self,
-        frame: &mut Frame,
-        area: &UiAreas,
-        data: &SuiteDataCollectionRaw,
-    ) -> Result<()> {
-        self.render_waiting_tests(frame, area.waiting_list, data);
+    fn draw(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataCollectionRaw) -> Result<()> {
+        self.render_waiting_tests(frame, area, data);
         Ok(())
     }
 }

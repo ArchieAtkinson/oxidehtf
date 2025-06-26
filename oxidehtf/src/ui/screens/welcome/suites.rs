@@ -7,12 +7,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::{
-    common::*,
-    event_handlers::MovementHandler,
-    test_runner::{SuiteDataCollectionRaw, TestState},
-    ui::UiAreas,
-};
+use crate::ui::screens::components::Attribute;
+use crate::{common::*, event_handlers::MovementHandler, test_runner::SuiteDataCollectionRaw};
 
 use super::Component;
 
@@ -21,23 +17,21 @@ enum Scroll {
     Down,
 }
 
-pub struct CurrentTestDisplay {
-    event_tx: Option<UnboundedSender<Event>>,
+pub struct SuitesDisplay {
     table_state: TableState,
     scrollbar_state: ScrollbarState,
     is_focused: bool,
     current_rows_seen: usize,
-    total_measurements: usize,
+    total_suites: usize,
 }
 
-impl CurrentTestDisplay {
+impl SuitesDisplay {
     pub fn new() -> Self {
         Self {
-            event_tx: None,
             table_state: TableState::default(),
             is_focused: false,
             current_rows_seen: 0,
-            total_measurements: 0,
+            total_suites: 0,
             scrollbar_state: ScrollbarState::new(0),
         }
     }
@@ -57,7 +51,7 @@ impl CurrentTestDisplay {
             }
         };
 
-        let max_offset = self.total_measurements - self.current_rows_seen;
+        let max_offset = self.total_suites - self.current_rows_seen;
         *offset = (*offset).clamp(0 as usize, max_offset);
     }
 
@@ -67,42 +61,19 @@ impl CurrentTestDisplay {
         area: Rect,
         data: &SuiteDataCollectionRaw,
     ) {
-        let current_test = data.current_suite().current_test();
         // 2 for border, 1 for header = 3
         self.current_rows_seen = usize::from(area.height) - 3;
-
-        let current_test_name: String = {
-            match current_test.state {
-                TestState::Running(_) => current_test.name.into(),
-                _ => "No Running Test".into(),
-            }
-        };
-
-        let dut: String = {
-            if data.dut_id.is_empty() {
-                "DUT not set".into()
-            } else {
-                data.dut_id.clone()
-            }
-        };
-
         let mut rows = Vec::new();
 
-        // Ensure we only display running test
-        if current_test.name == current_test_name {
-            for data in &current_test.user_data {
-                let name = data.0.clone();
-                let Some(value) = data.1.value.clone() else {
-                    break;
-                };
-                let value = format!("{}", value);
-                let unit = data.1.unit.clone().unwrap_or("None".into());
-                let row = Row::new(vec![name.into(), value, unit.into()]);
-                rows.push(row);
-            }
+        for (index, suite) in data.inner.iter().enumerate() {
+            let name = suite.name.to_string();
+            let priority = suite.priority.to_string();
+            let position = (index + 1).to_string();
+            let row = vec![position, name, priority];
+            rows.push(Row::from_iter(row));
         }
 
-        self.total_measurements = rows.len();
+        self.total_suites = data.inner.len();
 
         let rows = rows.iter_mut().enumerate().map(|(i, r)| {
             if i % 2 == 0 {
@@ -121,18 +92,9 @@ impl CurrentTestDisplay {
         // Columns widths are constrained in the same way as Layout...
         let widths = [Constraint::Min(5), Constraint::Min(5), Constraint::Min(5)];
         let table = Table::new(rows, widths)
-            .block(
-                Block::bordered()
-                    .border_style(border_style)
-                    .title(format!(
-                        " DUT: {} - Current Test: {} ",
-                        dut, current_test_name,
-                    ))
-                    .title_style(Style::default().bold()),
-            )
+            .block(Block::bordered().border_style(border_style))
             .header(
-                Row::new(vec!["Measurement Name", "Value", "Units"])
-                    .style(Style::new().underlined()),
+                Row::new(vec!["Run Order", "Name", "Priority"]).style(Style::new().underlined()),
             )
             .highlight_symbol(">>");
 
@@ -146,7 +108,7 @@ impl CurrentTestDisplay {
 
         self.scrollbar_state = self
             .scrollbar_state
-            .content_length(self.total_measurements)
+            .content_length(self.total_suites)
             .viewport_content_length(self.current_rows_seen);
 
         frame.render_stateful_widget(
@@ -160,21 +122,12 @@ impl CurrentTestDisplay {
     }
 }
 
-impl Component for CurrentTestDisplay {
-    fn init(&mut self) -> Result<()> {
-        Ok(())
-    }
-
+impl Component for SuitesDisplay {
     fn name(&self) -> &str {
-        "Current Test Measurements"
+        "Suites"
     }
 
-    fn register_event_handler(&mut self, tx: UnboundedSender<Event>) -> Result<()> {
-        self.event_tx = Some(tx.clone());
-        Ok(())
-    }
-
-    fn handle_events(&mut self, event: &Event) -> Result<Option<Action>> {
+    fn handle_event(&mut self, event: &Event) -> Result<Option<Action>> {
         if self.is_focused {
             Ok(MovementHandler::handle_event(event))
         } else {
@@ -191,25 +144,18 @@ impl Component for CurrentTestDisplay {
         Ok(None)
     }
 
-    fn can_focus(&self) -> bool {
-        true
+    fn set_attr(&mut self, attr: Attribute) -> Result<()> {
+        match attr {
+            Attribute::Focus(b) => {
+                self.is_focused = b.unwrap();
+                Ok(())
+            }
+            _ => Err(eyre!("Unknown Attr in {}", self.name())),
+        }
     }
 
-    fn focus(&mut self) {
-        self.is_focused = true;
-    }
-
-    fn blur(&mut self) {
-        self.is_focused = false;
-    }
-
-    fn draw(
-        &mut self,
-        frame: &mut Frame,
-        area: &UiAreas,
-        data: &SuiteDataCollectionRaw,
-    ) -> Result<()> {
-        let area = area.current_test;
+    fn draw(&mut self, frame: &mut Frame, area: Rect, data: &SuiteDataCollectionRaw) -> Result<()> {
+        let area = area.inner(Margin::new(area.width / 8, 1));
         self.render_current_test(frame, area, data);
         self.render_scrollbar(frame, area);
         Ok(())

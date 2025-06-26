@@ -1,7 +1,7 @@
 use tokio::sync::oneshot;
 use tui_input::InputRequest;
 
-use crate::app::Screen;
+use crate::ui::Screens;
 
 #[derive(Debug)]
 pub enum Action {
@@ -13,7 +13,7 @@ pub enum Action {
     MoveUp,
     MoveDown,
     UserKeyInputRequest(InputRequest),
-    ChangeScreen(Screen),
+    ChangeScreen(Screens),
     StartTests,
     SetCurrentSuiteDut(String),
 }
