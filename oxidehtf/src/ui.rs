@@ -89,8 +89,7 @@ impl Ui {
     }
 
     pub fn active(&mut self, screen: Screens) {
-        self.deactivate_screen(self.current_screen);
-        self.focus_stack.clear();
+        self.deactivate_screen();
         self.active_screen(screen);
 
         for (_, component) in self.components.iter_mut() {
@@ -107,12 +106,16 @@ impl Ui {
     pub fn focus_next(&mut self) {
         if let Some(current) = self.current_focus.clone() {
             self.set_attr(&current, Attribute::Focus(Some(false)));
+
             self.current_focus = self
                 .screens
                 .get_mut(&self.current_screen)
                 .unwrap()
                 .focus_next(&current);
-            self.set_attr(&current, Attribute::Focus(Some(false)));
+
+            if let Some(new) = self.current_focus.clone() {
+                self.set_attr(&new, Attribute::Focus(Some(true)));
+            }
         }
     }
 
@@ -126,7 +129,9 @@ impl Ui {
                 .unwrap()
                 .focus_previous(&current);
 
-            self.set_attr(&current, Attribute::Focus(Some(true)));
+            if let Some(new) = self.current_focus.clone() {
+                self.set_attr(&new, Attribute::Focus(Some(true)));
+            }
         }
     }
 
@@ -152,13 +157,13 @@ impl Ui {
         }
     }
 
-    fn deactivate_screen(&mut self, screen: Screens) {
+    fn deactivate_screen(&mut self) {
         if let Some(ref current) = self.current_focus.clone() {
             self.set_attr(current, Attribute::Focus(Some(false)));
         }
 
         self.screens
-            .get_mut(&screen)
+            .get_mut(&self.current_screen)
             .unwrap()
             .deactivate(&mut self.components);
     }

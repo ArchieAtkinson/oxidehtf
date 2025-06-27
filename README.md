@@ -40,6 +40,8 @@ OxideHTF provides (or will...):
         - End Test Run on failure
         - Asserts that can fail
         - Measurements that can fail
+    - Find a away to have SysContext tools standalone
+        - Allowing users to use the ones they want
 - Tools
     - Input over TUI
         - Text Input ✅
@@ -53,6 +55,10 @@ OxideHTF provides (or will...):
         - Units??
         - More validators
         - Transformation
+    - User logging
+        - Allow users to produce logs
+        - Display logs in TUI
+        - See OpenHTF
     - Native Flashing Support
         - Probe-RS?
     - Native Serial Support
@@ -75,12 +81,14 @@ OxideHTF provides (or will...):
         - More colours
     - Integrate WASM crate for web control
     - Welcome Screen ✅
-    - Summary Screen
+    - Summary Screen ✅
     - Test Data Viewer 
 - Reporting
     - Junit ✅
     - Custom JSON Report with all info
-
+- Config
+    - TOML File
+    - Command Line
 
 ```
                                   Test Suite Progress: 0% (0/2)
