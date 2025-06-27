@@ -66,7 +66,7 @@ impl Screen for SummaryScreen {
                         TestDone::Failed(_) => Style::default().red(),
                         TestDone::Passed => Style::default().green(),
                     },
-                    _ => panic!(""),
+                    _ => panic!("Not all tests are done"),
                 };
 
                 let line = Line::from(vec![

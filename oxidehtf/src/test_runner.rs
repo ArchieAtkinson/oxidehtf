@@ -96,12 +96,12 @@ impl TestRunner {
                 })?;
             }
 
-            self.event_tx.send(Event::TestsCompleted)?;
-
             executor.teardown()?;
 
             info!("Done");
         }
+
+        self.event_tx.send(Event::TestsCompleted)?;
         Ok(())
     }
 }
